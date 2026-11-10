@@ -2,7 +2,8 @@
 
 Sistema sob medida da RC Motos (loja de motos e carros no Piauí): estoque, vendas, lucro,
 comissões e painel — com login individual, hierarquia de acesso e histórico de tudo o que é
-feito. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`](CLAUDE.md).
+feito — e o site público da loja, com a vitrine ligada ao estoque e o laudo de procedência
+pela placa. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`](CLAUDE.md).
 
 ## O que já está pronto
 
@@ -15,11 +16,45 @@ feito. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`](CLAU
 | Comissão pela regra de cada vendedor + relatório do mês | pronto |
 | Painel: faturamento e lucro do mês, ticket médio moto/carro, estoque, parados | pronto |
 | Aportes (gastos pessoais investidos na loja), visíveis só a quem o dono habilitar | pronto |
-| Assistente de IA, procedência pela placa | a fazer (próximo passo) |
-| Asaas, cobrança, WhatsApp, site, linha do veículo, voz | a fazer |
+| Site público: vitrine sincronizada com o estoque, WhatsApp por veículo, SEO local | pronto |
+| Procedência pela placa: tela de consulta, semáforo, laudo salvo no veículo | pronto, **sem provedor real ainda** (ver abaixo) |
+| Assistente de IA | a fazer (próximo passo) |
+| Asaas, cobrança, WhatsApp/Instagram com IA, linha do veículo, voz | a fazer |
 
-O `index.html` na raiz é a prévia do site público mostrada ao cliente; o site definitivo
-(catálogo sincronizado com o estoque) entra em `apps/web` numa etapa posterior.
+O `index.html` na raiz é a prévia antiga do site mostrada ao cliente; o site de verdade é a
+página inicial de `apps/web`.
+
+## Site público
+
+A página inicial (`/`) é o site da loja; o sistema da equipe fica em `/login`.
+
+- **Vitrine**: mostra exatamente o que está "à venda" no sistema, com preço, fotos e botão de
+  WhatsApp com mensagem pronta. Vendeu ou mudou de etapa, sai do site na hora.
+- **Procedência**: o visitante digita a placa (ou toca em "Ver procedência" num anúncio) e vê o
+  laudo guardado daquele veículo. Só vale para veículo à venda na loja — o site não faz consulta
+  paga de placa de terceiros.
+- **Proposta**: monta a mensagem de WhatsApp (veículo, forma de pagamento, entrada, parcelas,
+  troca). O site não calcula juros nem promete valor.
+- Telefone, cidade, endereço, horário e Instagram vêm das variáveis `LOJA_*`. O que não for
+  preenchido não aparece — nada é inventado. **Preencha `LOJA_WHATSAPP` antes de publicar**: sem
+  ele os botões abrem o WhatsApp sem destinatário.
+- A placa completa não é publicada (só `ABC•••1`), para não facilitar clonagem. Quem digita a
+  placa inteira, porque viu o veículo, consegue o laudo.
+
+## Procedência pela placa
+
+- Na área da equipe (**Procedência**), dono e gerente consultam qualquer placa. O laudo fica no
+  histórico; se a placa é de um veículo do estoque, aparece na página dele. Placa consultada
+  antes da compra é ligada ao veículo quando ele for cadastrado.
+- **Ainda não há provedor real conectado.** Sem `PROCEDENCIA_PROVEDOR`, a tela avisa que a
+  consulta está desligada. Com `demonstracao` (ou `DADOS_DEMO=true`) os resultados são
+  **ilustrativos** e marcados como tal — placas terminadas em 3 dão "atenção" e em 7, "alerta".
+  O modo demonstração é recusado com `AMBIENTE=producao`, e laudo ilustrativo nunca aparece no
+  site fora da demonstração.
+- Para ligar o provedor nacional (ex.: Infosimples, na conta da loja): escrever em
+  `apps/api/app/procedencia.py` uma função que chama a API dele e devolve o mesmo formato de
+  `dados` (`veiculo` + `itens` com `situacao` ok/atencao/alerta), registrá-la em `_PROVEDORES`
+  e apontar `PROCEDENCIA_PROVEDOR` para ela. Telas, semáforo e histórico já funcionam em cima disso.
 
 ## Estrutura
 
@@ -129,6 +164,8 @@ interface recebe a lista pronta em `/auth/eu` (não há regra duplicada no front
 | financeiro | vendas e clientes (ver), comissões (ver e marcar como paga) |
 | vendedor | ver estoque **sem** valor de compra/custos/lucro, registrar venda no próprio nome, ver as próprias vendas e comissões |
 
+Consultar procedência: dono e gerente. Ver o laudo já salvo de um veículo: todos.
+
 Aportes: só o dono e quem ele marcar em **Equipe → Pode ver os aportes**.
 
 ## Regras de negócio que valem saber
@@ -175,9 +212,12 @@ Docker (`.env` na raiz): veja [`.env.example`](.env.example).
 | `SESSAO_HORAS` | duração do login | 168 (7 dias) |
 | `UPLOADS_DIR` | pasta das fotos | `uploads` |
 | `DADOS_DEMO` | mostra o aviso "números ilustrativos" | `false` |
+| `PROCEDENCIA_PROVEDOR` | provedor da consulta de placa (vazio = desligada) | vazio |
 | `DIAS_PARADO_ALERTA` | dias na mesma etapa para aparecer em "parados" | 45 |
 | `FUSO_HORARIO` | fuso da loja | `America/Fortaleza` |
 
 | Variável (web) | Para quê | Padrão |
 |---|---|---|
 | `API_URL` | endereço interno da API | `http://localhost:8000` |
+| `SITE_URL` | endereço público do site (SEO) | vazio |
+| `LOJA_WHATSAPP`, `LOJA_CIDADE`, `LOJA_ENDERECO`, `LOJA_HORARIO`, `LOJA_INSTAGRAM` | dados da loja mostrados no site | vazios |
