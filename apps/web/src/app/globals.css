@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource/anton";
+
+/* Identidade RC Motos */
+@theme {
+  --color-tinta: #0a0940;
+  --color-tinta-suave: #17165a;
+  --color-azul: #1610c4;
+  --color-azul-escuro: #12109e;
+  --color-amarelo: #ecd02f;
+  --color-amarelo-escuro: #d8bc1e;
+  --color-gelo: #f2f3fa;
+  --color-borda: #dfe1ee;
+  --color-suave: #5a5d72;
+  --color-nevoa: #b9bce0;
+  --color-verde: #14804a;
+  --color-vermelho: #c0271f;
+  --color-laranja: #b55c00;
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Anton", "Inter Variable", sans-serif;
+}
+
+body {
+  background: var(--color-gelo);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+/* Números de dinheiro alinham em coluna */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-amarelo);
+  outline-offset: 2px;
+}
+
+@keyframes subir {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.entrar {
+  animation: subir 0.2s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrar {
+    animation: none;
+  }
+}
