@@ -1,0 +1,183 @@
+# RC Motos Digital
+
+Sistema sob medida da RC Motos (loja de motos e carros no Piauí): estoque, vendas, lucro,
+comissões e painel — com login individual, hierarquia de acesso e histórico de tudo o que é
+feito. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`](CLAUDE.md).
+
+## O que já está pronto
+
+| Módulo | Situação |
+|---|---|
+| Login e senha individuais, perfis (dono, gerente, financeiro, vendedor) | pronto |
+| Histórico de ações (audit log): quem, quando, o quê | pronto |
+| Estoque de motos e carros: dados, fotos, custos, situação | pronto |
+| Baixa de venda em dois toques, lucro = venda − compra − custos | pronto |
+| Comissão pela regra de cada vendedor + relatório do mês | pronto |
+| Painel: faturamento e lucro do mês, ticket médio moto/carro, estoque, parados | pronto |
+| Aportes (gastos pessoais investidos na loja), visíveis só a quem o dono habilitar | pronto |
+| Assistente de IA, procedência pela placa | a fazer (próximo passo) |
+| Asaas, cobrança, WhatsApp, site, linha do veículo, voz | a fazer |
+
+O `index.html` na raiz é a prévia do site público mostrada ao cliente; o site definitivo
+(catálogo sincronizado com o estoque) entra em `apps/web` numa etapa posterior.
+
+## Estrutura
+
+```
+apps/api   FastAPI + SQLAlchemy 2 + Alembic (Python 3.13, gerenciado com uv)
+apps/web   Next.js (App Router) + TypeScript + Tailwind
+docker-compose.yml   banco (PostgreSQL 16) + api + web
+```
+
+O navegador só fala com a web. Ela repassa `/api/*` e `/arquivos/*` para a API pela rede
+interna, então o cookie de sessão fica na mesma origem e a API não precisa ser exposta.
+
+## Rodar com Docker (jeito mais simples)
+
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` (senha do banco, `DONO_NOME`, `DONO_EMAIL`, `DONO_SENHA`) e suba:
+
+```bash
+docker compose up --build -d
+```
+
+Crie o primeiro usuário (o dono), uma única vez:
+
+```bash
+docker compose exec api python -m app.seed
+```
+
+Abra <http://localhost:3000> e entre com o e-mail e a senha do dono. Os demais usuários são
+criados pelo dono na tela **Equipe**. As migrações do banco são aplicadas sozinhas toda vez
+que a API sobe.
+
+Para experimentar com dados de exemplo (veículos, vendas e usuários **ilustrativos**), ponha
+`DADOS_DEMO=true` no `.env` e rode:
+
+```bash
+docker compose exec api python -m app.seed --demo
+```
+
+Os usuários de exemplo (`gerente@exemplo.com`, `financeiro@exemplo.com`,
+`vendedor1@exemplo.com`, `vendedor2@exemplo.com`) entram com a senha `rcmotos123`. O `--demo`
+se recusa a rodar com `AMBIENTE=producao`.
+
+## Rodar sem Docker (desenvolvimento)
+
+Pré-requisitos: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22 e um PostgreSQL 16
+local com um banco `rcmotos` (e `rcmotos_teste` para os testes).
+
+API, em `apps/api`:
+
+```bash
+cp .env.example .env
+uv sync
+uv run alembic upgrade head
+DONO_EMAIL=voce@exemplo.com DONO_SENHA=uma-senha-forte uv run python -m app.seed
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+Web, em `apps/web`:
+
+```bash
+npm install
+API_URL=http://localhost:8000 npm run dev
+```
+
+A documentação interativa da API fica em <http://localhost:8000/docs> (desligada em produção).
+
+## Testes e verificações
+
+API (roda contra um Postgres de verdade, no banco `rcmotos_teste`, que é apagado a cada teste):
+
+```bash
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+```
+
+Web:
+
+```bash
+npm run lint && npx tsc --noEmit && npm run build
+```
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda tudo isso a cada pull request.
+
+## Banco e migrações
+
+Depois de mudar `apps/api/app/models.py`:
+
+```bash
+uv run alembic revision --autogenerate -m "descrição da mudança"
+uv run alembic upgrade head
+```
+
+Revise o arquivo gerado em `apps/api/alembic/versions/` antes de commitar.
+
+## Perfis e permissões
+
+A matriz fica em um único lugar: `apps/api/app/permissoes.py`. A API valida cada rota e a
+interface recebe a lista pronta em `/auth/eu` (não há regra duplicada no front).
+
+| Perfil | Pode |
+|---|---|
+| dono | tudo: equipe, aportes, histórico geral, excluir veículo |
+| gerente | estoque (editar, custos, fotos), vendas (registrar e cancelar), painel, comissões (ver) |
+| financeiro | vendas e clientes (ver), comissões (ver e marcar como paga) |
+| vendedor | ver estoque **sem** valor de compra/custos/lucro, registrar venda no próprio nome, ver as próprias vendas e comissões |
+
+Aportes: só o dono e quem ele marcar em **Equipe → Pode ver os aportes**.
+
+## Regras de negócio que valem saber
+
+- **Lucro** = valor da venda − valor de compra − custos lançados no veículo.
+- **Comissão**: cada usuário tem uma regra (% do lucro, % da venda ou valor fixo). A venda guarda
+  um retrato da regra; mudar a regra depois não altera vendas antigas. Venda com prejuízo não
+  gera comissão negativa.
+- Custo lançado **depois** da venda refaz o lucro; a comissão acompanha enquanto estiver pendente
+  e fica congelada depois de paga.
+- Só veículo **à venda** (com preço de venda) pode receber baixa. Cancelar a venda devolve o
+  veículo para "à venda" e cancela a comissão (se já estiver paga, é preciso desfazer o pagamento antes).
+- Etapas do veículo já seguem a linha do contrato: compra → documentação → preparação → à venda →
+  vendido → pós-venda → concluído.
+- Fotos são redimensionadas (1920 px + miniatura de 480 px) e têm os metadados removidos (GPS).
+- Cinco senhas erradas seguidas bloqueiam o login daquele e-mail por 15 minutos. Trocar a senha
+  ou desativar o usuário derruba as sessões abertas na hora.
+
+## Colocar em produção
+
+Pela cláusula 6 do contrato, domínio, hospedagem, banco e contas ficam **no nome da RC Motos**,
+com o desenvolvedor como administrador.
+
+1. Servidor (ou serviço de containers) com Docker, na conta da loja.
+2. `.env` com `AMBIENTE=producao`, senha forte do banco e `SEGREDO_JWT` gerado com
+   `openssl rand -hex 32`. A API se recusa a subir em produção sem esse segredo.
+3. **HTTPS obrigatório**: em produção o cookie de sessão só trafega por HTTPS. Coloque um proxy
+   com certificado (Caddy, Nginx ou o balanceador da nuvem) na frente da porta da web.
+4. `docker compose up --build -d` e `docker compose exec api python -m app.seed` para criar o dono.
+5. **Backups**: os dados vivem em dois volumes — `dados_banco` (PostgreSQL) e `fotos`. Agende
+   `pg_dump` diário e cópia do volume de fotos para fora do servidor.
+
+Atualizar a versão: `git pull` seguido de `docker compose up --build -d` (as migrações rodam ao subir).
+
+## Variáveis de ambiente
+
+Docker (`.env` na raiz): veja [`.env.example`](.env.example).
+
+| Variável (API) | Para quê | Padrão |
+|---|---|---|
+| `DATABASE_URL` | conexão com o PostgreSQL | banco local `rcmotos` |
+| `AMBIENTE` | `desenvolvimento` ou `producao` | `desenvolvimento` |
+| `SEGREDO_JWT` | assina a sessão; obrigatório em produção (≥ 32 caracteres) | segredo de desenvolvimento |
+| `SESSAO_HORAS` | duração do login | 168 (7 dias) |
+| `UPLOADS_DIR` | pasta das fotos | `uploads` |
+| `DADOS_DEMO` | mostra o aviso "números ilustrativos" | `false` |
+| `DIAS_PARADO_ALERTA` | dias na mesma etapa para aparecer em "parados" | 45 |
+| `FUSO_HORARIO` | fuso da loja | `America/Fortaleza` |
+
+| Variável (web) | Para quê | Padrão |
+|---|---|---|
+| `API_URL` | endereço interno da API | `http://localhost:8000` |

@@ -1,0 +1,63 @@
+# RC Motos Digital — sobe banco, API e web.
+#
+#   cp .env.example .env        # ajuste senhas
+#   docker compose up --build
+#   docker compose exec api python -m app.seed          # cria o dono (DONO_* do .env)
+#
+# Web em http://localhost:3000. A API não é publicada: o navegador fala só com a web,
+# que repassa /api/* para a API pela rede interna.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rcmotos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rcmotos}
+      POSTGRES_DB: ${POSTGRES_DB:-rcmotos}
+    volumes:
+      - dados_banco:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rcmotos}:${POSTGRES_PASSWORD:-rcmotos}@db:5432/${POSTGRES_DB:-rcmotos}
+      AMBIENTE: ${AMBIENTE:-desenvolvimento}
+      # Vazio = segredo de desenvolvimento embutido (a API recusa subir assim em produção).
+      SEGREDO_JWT: ${SEGREDO_JWT:-}
+      DADOS_DEMO: ${DADOS_DEMO:-false}
+      UPLOADS_DIR: /dados/uploads
+      DONO_NOME: ${DONO_NOME:-}
+      DONO_EMAIL: ${DONO_EMAIL:-}
+      DONO_SENHA: ${DONO_SENHA:-}
+    volumes:
+      - fotos:/dados/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/saude')"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  web:
+    build: ./apps/web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "${WEB_PORTA:-3000}:3000"
+
+volumes:
+  dados_banco:
+  fotos:
