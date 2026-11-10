@@ -14,7 +14,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app import audit, schemas, servicos
+from app import audit, procedencia, schemas, servicos
 from app.config import obter_config
 from app.db import SessionLocal
 from app.models import (
@@ -238,6 +238,34 @@ def criar_demo(db, dono: Usuario) -> None:
             55,
             [],
         ),
+        (
+            "moto",
+            "Honda",
+            "XRE 300",
+            2022,
+            "Cinza",
+            14000,
+            "PIJ1K24",
+            21500,
+            26900,
+            "a_venda",
+            3,
+            [("manutencao", "Revisão completa", 420)],
+        ),
+        (
+            "carro",
+            "Hyundai",
+            "HB20 1.0",
+            2018,
+            "Branco",
+            71000,
+            "PIK2L36",
+            41000,
+            49900,
+            "a_venda",
+            18,
+            [("documentacao", "Transferência", 380)],
+        ),
     ]
     veiculos = []
     for tipo, marca, modelo, ano, cor, km, placa, compra, preco, situacao, dias, custos in estoque:
@@ -303,6 +331,11 @@ def criar_demo(db, dono: Usuario) -> None:
             ),
             dono,
         )
+    # Laudos de procedência ilustrativos para o que está à venda (provedor de demonstração)
+    if procedencia.provedor_ativo() == "demonstracao":
+        for v in veiculos:
+            if v.situacao == Situacao.a_venda:
+                procedencia.consultar(db, v.placa, dono)
     db.add(
         Aporte(
             data=dia - timedelta(days=15),

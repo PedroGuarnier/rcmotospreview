@@ -21,6 +21,7 @@ from app.models import (
     Comissao,
     CustoVeiculo,
     FotoVeiculo,
+    LaudoProcedencia,
     Usuario,
     Veiculo,
     Venda,
@@ -35,6 +36,7 @@ ENTIDADES: dict[type, str] = {
     Venda: "venda",
     Comissao: "comissao",
     Aporte: "aporte",
+    LaudoProcedencia: "laudo",
 }
 
 # Campos de controle que não interessam ao histórico.
@@ -45,6 +47,7 @@ IGNORAR = {
     "bloqueado_ate",
     "versao_sessao",
     "situacao_desde",
+    "dados",  # corpo do laudo de procedência (grande; o laudo em si fica guardado)
 }
 SECRETOS = {"senha_hash"}
 
@@ -66,6 +69,8 @@ def _rotulo(obj: Any) -> str:
         return obj.nome
     if isinstance(obj, CustoVeiculo | Aporte):
         return obj.descricao
+    if isinstance(obj, LaudoProcedencia):
+        return f"da placa {obj.placa}"
     return f"nº {obj.id}"
 
 

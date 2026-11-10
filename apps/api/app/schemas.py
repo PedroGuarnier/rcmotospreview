@@ -17,6 +17,7 @@ from app.models import (
     FormaPagamento,
     Perfil,
     RegraComissao,
+    Semaforo,
     Situacao,
     StatusComissao,
     StatusVenda,
@@ -452,3 +453,80 @@ class PainelOut(BaseModel):
     parados: list[VeiculoParado]
     dias_parado_alerta: int
     comissoes_mes: list[ComissaoPorVendedor]
+
+
+# ---------- Procedência ----------
+
+
+class ConsultaPlaca(BaseModel):
+    placa: Annotated[str, AfterValidator(validacao.normalizar_placa)]
+
+
+class ItemLaudo(BaseModel):
+    chave: str
+    titulo: str
+    situacao: str  # ok | atencao | alerta
+    detalhe: str
+
+
+class MarcoHistorico(BaseModel):
+    """Um ponto da linha do tempo do veículo."""
+
+    quando: str  # "2021" ou "10/11/2026"
+    titulo: str
+    detalhe: str | None = None
+
+
+class LaudoOut(BaseModel):
+    id: int
+    placa: str
+    semaforo: Semaforo
+    ilustrativo: bool
+    provedor: str
+    criado_em: datetime
+    consultado_por: str | None
+    veiculo_id: int | None
+    veiculo_descricao: str | None
+    dados_veiculo: dict
+    itens: list[ItemLaudo]
+    historico: list[MarcoHistorico]
+
+
+class SituacaoProcedencia(BaseModel):
+    disponivel: bool
+    ilustrativo: bool
+
+
+# ---------- Site público ----------
+
+
+class VeiculoPublico(BaseModel):
+    id: int
+    tipo: TipoVeiculo
+    marca: str
+    modelo: str
+    ano_fabricacao: int | None
+    ano_modelo: int | None
+    cor: str | None
+    km: int | None
+    preco: Decimal
+    # A placa completa não é publicada (evita clonagem): só o início e o final.
+    placa_mascarada: str | None
+    fotos: list[FotoOut]
+    dias_na_loja: int
+    semaforo: Semaforo | None
+
+
+class CatalogoPublico(BaseModel):
+    veiculos: list[VeiculoPublico]
+    ilustrativo: bool
+
+
+class ProcedenciaPublica(BaseModel):
+    placa: str  # completa quando o visitante digitou; mascarada quando veio do anúncio
+    veiculo: VeiculoPublico
+    semaforo: Semaforo | None
+    consultado_em: datetime | None
+    ilustrativo: bool
+    itens: list[ItemLaudo]
+    historico: list[MarcoHistorico]

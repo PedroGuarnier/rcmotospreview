@@ -19,6 +19,7 @@ class P(enum.StrEnum):
     estoque_ver = "estoque.ver"
     estoque_editar = "estoque.editar"
     custos_ver = "custos.ver"  # valor de compra, custos e lucro
+    procedencia_consultar = "procedencia.consultar"
     vendas_registrar = "vendas.registrar"
     vendas_ver_todas = "vendas.ver_todas"
     vendas_cancelar = "vendas.cancelar"
@@ -39,6 +40,7 @@ MATRIZ: dict[Perfil, frozenset[P]] = {
             P.estoque_ver,
             P.estoque_editar,
             P.custos_ver,
+            P.procedencia_consultar,
             P.vendas_registrar,
             P.vendas_ver_todas,
             P.vendas_cancelar,

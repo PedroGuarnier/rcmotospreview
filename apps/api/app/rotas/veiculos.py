@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app import fotos, schemas
+from app import fotos, procedencia, schemas
 from app.db import obter_db
 from app.models import (
     SITUACOES_EM_ESTOQUE,
@@ -180,6 +180,8 @@ def criar(
     _conferir_situacao(veiculo, dados.situacao)
     veiculo.situacao = dados.situacao
     db.add(veiculo)
+    db.flush()
+    procedencia.ligar_laudos_ao_veiculo(db, veiculo)
     db.commit()
     return _detalhe(_obter(db, veiculo.id), usuario)
 
@@ -220,6 +222,8 @@ def atualizar(
         mudar_situacao(veiculo, nova_situacao)
     if "valor_compra" in campos:
         recalcular_venda_do_veiculo(veiculo)
+    if "placa" in campos:
+        procedencia.ligar_laudos_ao_veiculo(db, veiculo)
     db.commit()
     return _detalhe(_obter(db, veiculo.id), usuario)
 

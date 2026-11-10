@@ -14,6 +14,8 @@ from app.rotas import (
     comissoes,
     historico,
     painel,
+    procedencia,
+    publico,
     usuarios,
     veiculos,
     vendas,
@@ -30,7 +32,19 @@ app = FastAPI(
     openapi_url=None if cfg.producao else "/openapi.json",
 )
 
-for modulo in (auth, usuarios, veiculos, clientes, vendas, comissoes, painel, aportes, historico):
+for modulo in (
+    auth,
+    usuarios,
+    veiculos,
+    clientes,
+    vendas,
+    comissoes,
+    painel,
+    aportes,
+    historico,
+    procedencia,
+    publico,
+):
     app.include_router(modulo.router)
 
 cfg.uploads_dir.mkdir(parents=True, exist_ok=True)

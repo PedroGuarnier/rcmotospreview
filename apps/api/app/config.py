@@ -30,6 +30,10 @@ class Config(BaseSettings):
     fuso_horario: str = "America/Fortaleza"
     dias_parado_alerta: int = 45
 
+    # Consulta de procedência pela placa: "" (desligada) | "demonstracao".
+    # O provedor real (ex.: Infosimples) entra aqui quando a conta da loja existir.
+    procedencia_provedor: str = ""
+
     # Quando true, a interface avisa que os números são ilustrativos (dados do seed --demo).
     dados_demo: bool = False
 

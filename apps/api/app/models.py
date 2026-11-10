@@ -91,6 +91,14 @@ class StatusComissao(enum.StrEnum):
     cancelada = "cancelada"
 
 
+class Semaforo(enum.StrEnum):
+    """Resultado do laudo de procedência."""
+
+    verde = "verde"  # nada consta
+    amarelo = "amarelo"  # ponto de atenção
+    vermelho = "vermelho"  # restrição encontrada
+
+
 def _enum(tipo: type[enum.Enum]) -> SAEnum:
     return SAEnum(
         tipo, native_enum=False, length=30, values_callable=lambda e: [m.value for m in e]
@@ -172,6 +180,9 @@ class Veiculo(Base):
         order_by="FotoVeiculo.ordem, FotoVeiculo.id",
     )
     vendas: Mapped[list["Venda"]] = relationship(back_populates="veiculo", order_by="Venda.id")
+    laudos: Mapped[list["LaudoProcedencia"]] = relationship(
+        back_populates="veiculo", order_by="LaudoProcedencia.id.desc()"
+    )
 
     @property
     def total_custos(self) -> Decimal:
@@ -335,6 +346,32 @@ class Aporte(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     registrado_por: Mapped[Usuario | None] = relationship()
+
+
+class LaudoProcedencia(Base):
+    """Laudo da consulta de procedência pela placa, guardado no histórico do veículo.
+
+    `veiculo_id` fica vazio quando a placa é consultada antes da compra; ao cadastrar o
+    veículo com a mesma placa, os laudos são ligados a ele.
+    """
+
+    __tablename__ = "laudos_procedencia"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    veiculo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("veiculos.id", ondelete="SET NULL"), index=True
+    )
+    placa: Mapped[str] = mapped_column(String(8), index=True)
+    provedor: Mapped[str] = mapped_column(String(40))
+    # True quando veio do provedor de demonstração: nunca vale como laudo de verdade.
+    ilustrativo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    semaforo: Mapped[Semaforo] = mapped_column(_enum(Semaforo))
+    dados: Mapped[dict] = mapped_column(JSONB)
+    consultado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    veiculo: Mapped[Veiculo | None] = relationship(back_populates="laudos")
+    consultado_por: Mapped[Usuario | None] = relationship()
 
 
 class AuditLog(Base):
