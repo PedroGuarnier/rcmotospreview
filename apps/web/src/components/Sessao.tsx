@@ -46,6 +46,12 @@ const ICONES = {
       <circle cx="17" cy="17" r="2.5" />
     </>
   ),
+  procedencia: (
+    <>
+      <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+      <path d="M2.5 9.5h19M7 14h2M11 14h2M15 14h2" />
+    </>
+  ),
   aportes: <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16" />,
   equipe: (
     <>
@@ -96,6 +102,7 @@ interface ItemMenu {
 const MENU: ItemMenu[] = [
   { href: "/painel", rotulo: "Painel", icone: "painel", permissao: "painel.ver", principal: true },
   { href: "/estoque", rotulo: "Estoque", icone: "estoque", permissao: "estoque.ver", principal: true },
+  { href: "/procedencia", rotulo: "Procedência", icone: "procedencia", permissao: "procedencia.consultar" },
   { href: "/vendas", rotulo: "Vendas", icone: "vendas", principal: true },
   { href: "/comissoes", rotulo: "Comissões", icone: "comissoes", principal: true },
   { href: "/aportes", rotulo: "Aportes", icone: "aportes", permissao: "aportes.ver" },

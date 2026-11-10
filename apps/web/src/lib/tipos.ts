@@ -19,6 +19,7 @@ export type Permissao =
   | "estoque.ver"
   | "estoque.editar"
   | "custos.ver"
+  | "procedencia.consultar"
   | "vendas.registrar"
   | "vendas.ver_todas"
   | "vendas.cancelar"
@@ -216,4 +217,75 @@ export interface Painel {
   parados: { id: number; descricao: string; situacao: Situacao; dias: number }[];
   dias_parado_alerta: number;
   comissoes_mes: ComissaoPorVendedor[];
+}
+
+// ---------- Procedência e site público ----------
+
+export type Semaforo = "verde" | "amarelo" | "vermelho";
+
+export interface ItemLaudo {
+  chave: string;
+  titulo: string;
+  situacao: "ok" | "atencao" | "alerta";
+  detalhe: string;
+}
+
+export interface MarcoHistorico {
+  quando: string;
+  titulo: string;
+  detalhe: string | null;
+}
+
+export interface Laudo {
+  id: number;
+  placa: string;
+  semaforo: Semaforo;
+  ilustrativo: boolean;
+  provedor: string;
+  criado_em: string;
+  consultado_por: string | null;
+  veiculo_id: number | null;
+  veiculo_descricao: string | null;
+  dados_veiculo: {
+    marca_modelo?: string;
+    ano_fabricacao?: number | null;
+    ano_modelo?: number | null;
+    cor?: string | null;
+    tipo?: TipoVeiculo;
+    municipio?: string;
+    uf?: string;
+  };
+  itens: ItemLaudo[];
+  historico: MarcoHistorico[];
+}
+
+export interface VeiculoPublico {
+  id: number;
+  tipo: TipoVeiculo;
+  marca: string;
+  modelo: string;
+  ano_fabricacao: number | null;
+  ano_modelo: number | null;
+  cor: string | null;
+  km: number | null;
+  preco: string;
+  placa_mascarada: string | null;
+  fotos: Foto[];
+  dias_na_loja: number;
+  semaforo: Semaforo | null;
+}
+
+export interface CatalogoPublico {
+  veiculos: VeiculoPublico[];
+  ilustrativo: boolean;
+}
+
+export interface ProcedenciaPublica {
+  placa: string;
+  veiculo: VeiculoPublico;
+  semaforo: Semaforo | null;
+  consultado_em: string | null;
+  ilustrativo: boolean;
+  itens: ItemLaudo[];
+  historico: MarcoHistorico[];
 }

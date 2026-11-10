@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import useSWR from "swr";
 import { ListaEventos } from "@/components/Eventos";
+import { Semaforo } from "@/components/placa/Laudo";
 import { FormVeiculo } from "@/components/FormVeiculo";
 import { Exigir, usePode } from "@/components/Sessao";
 import { VenderModal } from "@/components/VenderModal";
@@ -36,7 +37,7 @@ import {
   placa,
   valorParaApi,
 } from "@/lib/formato";
-import type { Evento, Situacao, TipoCusto, VeiculoDetalhe } from "@/lib/tipos";
+import type { Evento, Laudo, Situacao, TipoCusto, VeiculoDetalhe } from "@/lib/tipos";
 
 function Dado({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -300,6 +301,72 @@ function Custos({ v, aoMudar }: { v: VeiculoDetalhe; aoMudar: (v: VeiculoDetalhe
   );
 }
 
+const SINAL = { verde: "Nada consta", amarelo: "Ponto de atenção", vermelho: "Restrição encontrada" } as const;
+const COR_ITEM = { ok: "bg-verde", atencao: "bg-amarelo-escuro", alerta: "bg-vermelho" } as const;
+
+function Procedencia({ v }: { v: VeiculoDetalhe }) {
+  const pode = usePode();
+  const { data: laudos } = useSWR<Laudo[]>(`/veiculos/${v.id}/laudos`, buscar);
+  const ultimo = laudos?.[0];
+  return (
+    <Secao
+      titulo="Procedência"
+      acoes={
+        pode("procedencia.consultar") &&
+        v.placa && (
+          <Link
+            href={`/procedencia?placa=${v.placa}`}
+            className="inline-flex min-h-9 items-center rounded-full border border-borda bg-white px-3.5 text-sm font-semibold hover:border-azul"
+          >
+            {ultimo ? "Consultar de novo" : "Consultar pela placa"}
+          </Link>
+        )
+      }
+    >
+      {!laudos ? (
+        <Carregando />
+      ) : !ultimo ? (
+        <p className="text-sm text-suave">
+          {v.placa ? "Nenhuma consulta feita para esta placa." : "Cadastre a placa para consultar a procedência."}
+        </p>
+      ) : (
+        <>
+          <div className="flex items-center gap-3">
+            <Semaforo cor={ultimo.semaforo} deitado tamanho="1.1rem" />
+            <p>
+              <b>{SINAL[ultimo.semaforo]}</b>
+              <span className="text-sm text-suave">
+                {" "}
+                · {data(ultimo.criado_em)}
+                {ultimo.consultado_por && ` · ${ultimo.consultado_por}`}
+              </span>
+              {ultimo.ilustrativo && (
+                <span className="ml-2">
+                  <Etiqueta cor="amarelo">Ilustrativo</Etiqueta>
+                </span>
+              )}
+            </p>
+          </div>
+          <ul className="mt-3 divide-y divide-borda text-sm">
+            {ultimo.itens.map((item) => (
+              <li key={item.chave} className="flex items-start gap-3 py-2">
+                <i aria-hidden className={`mt-1.5 size-2.5 shrink-0 rounded-full ${COR_ITEM[item.situacao]}`} />
+                <span>
+                  <b>{item.titulo}</b>
+                  <span className="block text-suave">{item.detalhe}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {laudos.length > 1 && (
+            <p className="mt-2 text-xs text-suave">{laudos.length} consultas guardadas para este veículo.</p>
+          )}
+        </>
+      )}
+    </Secao>
+  );
+}
+
 function Veiculo() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -435,6 +502,8 @@ function Veiculo() {
           </dl>
           {v.observacoes && <p className="mt-4 whitespace-pre-line text-sm text-suave">{v.observacoes}</p>}
         </Secao>
+
+        <Procedencia v={v} />
 
         <Custos v={v} aoMudar={atualizar} />
 

@@ -9,6 +9,7 @@ const ENTIDADE: Record<string, string> = {
   venda: "venda",
   comissao: "comissão",
   aporte: "aporte",
+  laudo: "laudo de procedência",
   usuario: "usuário",
   sessao: "",
 };
@@ -56,6 +57,8 @@ const CAMPO: Record<string, string> = {
   motivo_cancelamento: "motivo do cancelamento",
   paga_em: "paga em",
   ordem: "ordem",
+  semaforo: "sinal",
+  ilustrativo: "ilustrativo",
 };
 
 const DINHEIRO = new Set([
@@ -63,7 +66,7 @@ const DINHEIRO = new Set([
 ]);
 const OCULTOS = new Set([
   "veiculo_id", "cliente_id", "vendedor_id", "venda_id", "registrada_por_id", "registrado_por_id",
-  "cancelada_por_id", "cancelada_em", "arquivo", "miniatura", "regra", "regra_valor", "ordem",
+  "cancelada_por_id", "cancelada_em", "consultado_por_id", "provedor", "arquivo", "miniatura", "regra", "regra_valor", "ordem",
 ]);
 
 const VALOR: Record<string, string> = {

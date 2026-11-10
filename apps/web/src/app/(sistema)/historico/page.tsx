@@ -14,6 +14,7 @@ const ENTIDADES = [
   { valor: "veiculo", rotulo: "Veículos" },
   { valor: "custo", rotulo: "Custos" },
   { valor: "venda", rotulo: "Vendas" },
+  { valor: "laudo", rotulo: "Procedência" },
   { valor: "comissao", rotulo: "Comissões" },
   { valor: "cliente", rotulo: "Clientes" },
   { valor: "aporte", rotulo: "Aportes" },

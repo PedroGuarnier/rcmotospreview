@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
 @import "@fontsource/anton";
+@import "@fontsource/b612-mono/700.css";
+@import "@fontsource/b612/700.css";
 
 /* Identidade RC Motos */
 @theme {
@@ -20,6 +22,10 @@
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Anton", "Inter Variable", sans-serif;
+  /* caracteres de placa e dados (ano, km, preço) */
+  --font-placa: "B612 Mono", ui-monospace, monospace;
+  /* mesma família, proporcional: rótulos e números com pontuação (R$ 12.900,00) */
+  --font-dado: "B612", "Inter Variable", sans-serif;
 }
 
 body {
@@ -59,4 +65,13 @@ body {
   .entrar {
     animation: none;
   }
+}
+
+.placa-aviso {
+  min-height: 1.4em;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  color: #ecd02f;
 }
