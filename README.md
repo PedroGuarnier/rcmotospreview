@@ -200,6 +200,28 @@ com o desenvolvedor como administrador.
 
 Atualizar a versão: `git pull` seguido de `docker compose up --build -d` (as migrações rodam ao subir).
 
+## Demonstração gratuita (Render)
+
+Para mostrar o sistema a alguém antes de ter a hospedagem da loja, há uma versão de
+demonstração que roda API e site **em um container só**, com dados ilustrativos:
+
+1. Crie uma conta em render.com e conecte o GitHub.
+2. **New > Blueprint**, escolha este repositório e o ramo. O Render lê o `render.yaml` e cria
+   o serviço `rcmotos-demo` e o banco `rcmotos-demo-db`.
+3. Quando terminar, o endereço aparece no topo do serviço (`https://….onrender.com`).
+4. Para entrar na área da equipe: `dono@exemplo.com` com a senha em **Environment >
+   DONO_SENHA**; os usuários de exemplo usam a senha em **SENHA_DEMO**. As duas são geradas
+   pelo Render — a senha padrão da documentação não funciona lá.
+
+Limites do plano gratuito (confira os atuais na página de preços do Render): o serviço dorme
+depois de um tempo sem visitas e demora cerca de um minuto para acordar; o banco gratuito tem
+prazo de validade; fotos enviadas somem a cada reinício. Serve para demonstrar, não para a
+loja usar. Arquivos: `render.yaml`, `deploy/demonstracao/`.
+
+Se o Blueprint não for aceito, crie na mão: um **PostgreSQL** gratuito e um **Web Service**
+do tipo Docker com *Dockerfile Path* `./deploy/demonstracao/Dockerfile`, *Docker Context* `.`
+e as variáveis listadas no `render.yaml` (`DATABASE_URL` = *Internal Database URL* do banco).
+
 ## Variáveis de ambiente
 
 Docker (`.env` na raiz): veja [`.env.example`](.env.example).

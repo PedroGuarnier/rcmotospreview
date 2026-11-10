@@ -37,6 +37,15 @@ class Config(BaseSettings):
     # Quando true, a interface avisa que os números são ilustrativos (dados do seed --demo).
     dados_demo: bool = False
 
+    @field_validator("database_url")
+    @classmethod
+    def _usar_driver_psycopg(cls, url: str) -> str:
+        # Hospedagens entregam "postgres://" ou "postgresql://"; o driver instalado é o psycopg 3.
+        for prefixo in ("postgres://", "postgresql://"):
+            if url.startswith(prefixo):
+                return "postgresql+psycopg://" + url[len(prefixo) :]
+        return url
+
     @field_validator("segredo_jwt", mode="before")
     @classmethod
     def _segredo_vazio_usa_padrao(cls, valor: str | None) -> str:

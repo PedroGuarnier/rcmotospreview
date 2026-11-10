@@ -1,0 +1,46 @@
+# Demonstração gratuita no Render: um serviço web (API + site juntos) e um Postgres.
+#
+# No Render: New > Blueprint > escolha este repositório. Depois de criado, as senhas geradas
+# ficam em rcmotos-demo > Environment (DONO_SENHA e SENHA_DEMO).
+#
+# É só para mostrar o sistema com dados ILUSTRATIVOS. No plano gratuito o serviço dorme
+# quando fica sem visitas, o banco tem prazo de validade e as fotos enviadas se perdem a
+# cada reinício. Produção de verdade usa o docker-compose.yml, na infraestrutura da loja.
+
+databases:
+  - name: rcmotos-demo-db
+    plan: free
+    databaseName: rcmotos
+    user: rcmotos
+
+services:
+  - type: web
+    name: rcmotos-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/demonstracao/Dockerfile
+    dockerContext: .
+    healthCheckPath: /login
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rcmotos-demo-db
+          property: connectionString
+      - key: SEGREDO_JWT
+        generateValue: true
+      - key: DADOS_DEMO
+        value: "true"
+      - key: DONO_NOME
+        value: Dono (demonstração)
+      - key: DONO_EMAIL
+        value: dono@exemplo.com
+      # Senhas geradas pelo Render: ninguém entra com a senha padrão da documentação.
+      - key: DONO_SENHA
+        generateValue: true
+      - key: SENHA_DEMO
+        generateValue: true
+      # Dados da loja no site: preencha no painel do Render (o que ficar vazio não aparece).
+      - key: LOJA_WHATSAPP
+        sync: false
+      - key: LOJA_CIDADE
+        sync: false

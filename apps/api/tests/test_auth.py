@@ -60,3 +60,12 @@ def test_usuario_desativado_perde_acesso_na_hora(dono):
     assert sessao.get("/auth/eu").status_code == 401
     r = sessao.post("/auth/entrar", json={"email": usuario.email, "senha": SENHA})
     assert r.status_code == 401
+
+
+def test_database_url_de_hospedagem_usa_o_driver_instalado():
+    from app.config import Config
+
+    for recebida in ("postgres://u:s@host/db", "postgresql://u:s@host/db"):
+        assert Config(database_url=recebida).database_url == "postgresql+psycopg://u:s@host/db"
+    intacta = "postgresql+psycopg://u:s@host:5432/db"
+    assert Config(database_url=intacta).database_url == intacta

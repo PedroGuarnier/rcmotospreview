@@ -32,7 +32,9 @@ from app.models import (
 from app.security import gerar_hash
 from app.tempo import hoje
 
-SENHA_DEMO = "rcmotos123"
+# Senha dos usuários de exemplo. Em demonstração publicada na internet, defina SENHA_DEMO
+# com um valor próprio: a senha padrão está escrita na documentação.
+SENHA_DEMO = os.environ.get("SENHA_DEMO") or "rcmotos123"
 
 
 def criar_dono(db) -> Usuario:
@@ -345,7 +347,8 @@ def criar_demo(db, dono: Usuario) -> None:
         )
     )
     db.commit()
-    print(f"Dados ilustrativos criados. Senha dos usuários de exemplo: {SENHA_DEMO}")
+    origem = "definida em SENHA_DEMO" if os.environ.get("SENHA_DEMO") else SENHA_DEMO
+    print(f"Dados ilustrativos criados. Senha dos usuários de exemplo: {origem}")
 
 
 def main() -> None:
