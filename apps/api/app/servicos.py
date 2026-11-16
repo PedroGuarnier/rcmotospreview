@@ -24,6 +24,32 @@ from app.tempo import hoje
 
 CENTAVO = Decimal("0.01")
 
+# Do mais grave para o mais leve
+NIVEIS = ("vencido", "hoje", "urgente", "atencao", "ok")
+
+
+def nivel_do_prazo(dias_restantes: int, urgente_ate: int, atencao_ate: int) -> str:
+    """Classifica um prazo: vencido, hoje, urgente, atencao ou ok."""
+    if dias_restantes < 0:
+        return "vencido"
+    if dias_restantes == 0:
+        return "hoje"
+    if dias_restantes <= urgente_ate:
+        return "urgente"
+    if dias_restantes <= atencao_ate:
+        return "atencao"
+    return "ok"
+
+
+def nivel_do_debito(prazo, dia) -> str:
+    """Contrato: alertas faltando 15 dias, 7 dias e no dia."""
+    return nivel_do_prazo((prazo - dia).days, urgente_ate=7, atencao_ate=15)
+
+
+def nivel_da_transferencia(prazo, dia) -> str:
+    """Contrato: lembretes nos dias 10, 20 e 25 de um prazo de 30 (faltando 20, 10 e 5)."""
+    return nivel_do_prazo((prazo - dia).days, urgente_ate=5, atencao_ate=20)
+
 
 def erro(codigo: int, mensagem: str) -> HTTPException:
     return HTTPException(codigo, mensagem)

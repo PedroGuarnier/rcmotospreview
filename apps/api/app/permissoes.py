@@ -23,6 +23,7 @@ class P(enum.StrEnum):
     vendas_registrar = "vendas.registrar"
     vendas_ver_todas = "vendas.ver_todas"
     vendas_cancelar = "vendas.cancelar"
+    transferencia_gerir = "transferencia.gerir"  # marcar a transferência do veículo vendido
     clientes_ver = "clientes.ver"
     comissoes_ver_todas = "comissoes.ver_todas"
     comissoes_pagar = "comissoes.pagar"
@@ -44,6 +45,7 @@ MATRIZ: dict[Perfil, frozenset[P]] = {
             P.vendas_registrar,
             P.vendas_ver_todas,
             P.vendas_cancelar,
+            P.transferencia_gerir,
             P.clientes_ver,
             P.comissoes_ver_todas,
             P.painel_ver,
@@ -54,6 +56,7 @@ MATRIZ: dict[Perfil, frozenset[P]] = {
         {
             P.estoque_ver,
             P.vendas_ver_todas,
+            P.transferencia_gerir,
             P.clientes_ver,
             P.comissoes_ver_todas,
             P.comissoes_pagar,

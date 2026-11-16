@@ -68,6 +68,20 @@ class TipoCusto(enum.StrEnum):
     outro = "outro"
 
 
+class TipoDebito(enum.StrEnum):
+    """Débitos que vêm com o veículo na compra."""
+
+    ipva = "ipva"
+    licenciamento = "licenciamento"
+    multa = "multa"
+    outro = "outro"
+
+
+class StatusDebito(enum.StrEnum):
+    aberto = "aberto"
+    pago = "pago"
+
+
 class FormaPagamento(enum.StrEnum):
     a_vista = "a_vista"
     financiado_banco = "financiado_banco"
@@ -180,6 +194,11 @@ class Veiculo(Base):
         order_by="FotoVeiculo.ordem, FotoVeiculo.id",
     )
     vendas: Mapped[list["Venda"]] = relationship(back_populates="veiculo", order_by="Venda.id")
+    debitos: Mapped[list["DebitoVeiculo"]] = relationship(
+        back_populates="veiculo",
+        cascade="all, delete-orphan",
+        order_by="DebitoVeiculo.prazo, DebitoVeiculo.id",
+    )
     laudos: Mapped[list["LaudoProcedencia"]] = relationship(
         back_populates="veiculo", order_by="LaudoProcedencia.id.desc()"
     )
@@ -192,6 +211,14 @@ class Veiculo(Base):
     def custo_total(self) -> Decimal:
         """Tudo o que a loja investiu no veículo: compra + custos."""
         return self.valor_compra + self.total_custos
+
+    @property
+    def debitos_abertos(self) -> list["DebitoVeiculo"]:
+        return [d for d in self.debitos if d.status == StatusDebito.aberto]
+
+    @property
+    def total_debitos_abertos(self) -> Decimal:
+        return sum((d.valor for d in self.debitos_abertos), Decimal("0.00"))
 
     @property
     def venda_ativa(self) -> "Venda | None":
@@ -222,6 +249,34 @@ class CustoVeiculo(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     veiculo: Mapped[Veiculo] = relationship(back_populates="custos")
+
+
+class DebitoVeiculo(Base):
+    """Débito pendente do veículo (IPVA, licenciamento, multa) com data-limite.
+
+    Enquanto está aberto, o veículo não vai "à venda". Ao ser pago vira custo do veículo.
+    """
+
+    __tablename__ = "debitos_veiculo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    veiculo_id: Mapped[int] = mapped_column(
+        ForeignKey("veiculos.id", ondelete="CASCADE"), index=True
+    )
+    tipo: Mapped[TipoDebito] = mapped_column(_enum(TipoDebito))
+    descricao: Mapped[str] = mapped_column(String(200))
+    valor: Mapped[Decimal] = mapped_column(Dinheiro)
+    prazo: Mapped[date] = mapped_column(Date, index=True)
+    status: Mapped[StatusDebito] = mapped_column(_enum(StatusDebito), default=StatusDebito.aberto)
+    pago_em: Mapped[date | None] = mapped_column(Date)
+    # Custo lançado quando o débito foi pago (para desfazer, se preciso)
+    custo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("custos_veiculo.id", ondelete="SET NULL")
+    )
+    registrado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    veiculo: Mapped[Veiculo] = relationship(back_populates="debitos")
 
 
 class FotoVeiculo(Base):
@@ -298,6 +353,8 @@ class Venda(Base):
     cancelada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
     motivo_cancelamento: Mapped[str | None] = mapped_column(String(300))
+    # Dia em que o comprador passou o veículo para o próprio nome (prazo: 30 dias da venda)
+    transferida_em: Mapped[date | None] = mapped_column(Date)
     observacoes: Mapped[str | None] = mapped_column(Text)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     atualizado_em: Mapped[datetime] = mapped_column(

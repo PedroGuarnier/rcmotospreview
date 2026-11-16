@@ -29,6 +29,8 @@ class Config(BaseSettings):
     # Regras de negócio
     fuso_horario: str = "America/Fortaleza"
     dias_parado_alerta: int = 45
+    # Prazo do comprador para transferir o veículo, contado da venda
+    prazo_transferencia_dias: int = 30
 
     # Consulta de procedência pela placa: "" (desligada) | "demonstracao".
     # O provedor real (ex.: Infosimples) entra aqui quando a conta da loja existir.

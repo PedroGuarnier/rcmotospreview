@@ -10,6 +10,7 @@ from app.db import SessionLocal
 from app.rotas import (
     aportes,
     auth,
+    avisos,
     clientes,
     comissoes,
     historico,
@@ -33,6 +34,7 @@ app = FastAPI(
 )
 
 for modulo in (
+    avisos,
     auth,
     usuarios,
     veiculos,

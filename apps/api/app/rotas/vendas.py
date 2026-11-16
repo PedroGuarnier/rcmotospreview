@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -6,9 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app import schemas, servicos
+from app.config import obter_config
 from app.db import obter_db
 from app.models import StatusVenda, Usuario, Venda
 from app.permissoes import P, exigir, pode, usuario_atual
+from app.tempo import hoje
 
 router = APIRouter(prefix="/vendas", tags=["vendas"])
 
@@ -29,6 +31,26 @@ def intervalo_do_mes(mes: str) -> tuple[date, date]:
         raise HTTPException(422, "Mês inválido. Use AAAA-MM.") from exc
     fim = date(ano + 1, 1, 1) if numero == 12 else date(ano, numero + 1, 1)
     return inicio, fim
+
+
+def prazo_transferencia(venda: Venda) -> date:
+    return venda.data_venda + timedelta(days=obter_config().prazo_transferencia_dias)
+
+
+def transferencia_da(venda: Venda) -> schemas.TransferenciaOut:
+    prazo = prazo_transferencia(venda)
+    restantes = (prazo - hoje()).days
+    if venda.transferida_em is not None:
+        situacao = "transferida"
+    else:
+        nivel = servicos.nivel_da_transferencia(prazo, hoje())
+        situacao = "vencida" if nivel == "vencido" else "no_prazo" if nivel == "ok" else "cobrar"
+    return schemas.TransferenciaOut(
+        prazo=prazo,
+        transferida_em=venda.transferida_em,
+        dias_restantes=restantes,
+        situacao=situacao,
+    )
 
 
 def serializar(venda: Venda, usuario: Usuario) -> schemas.VendaOut:
@@ -55,6 +77,7 @@ def serializar(venda: Venda, usuario: Usuario) -> schemas.VendaOut:
         "observacoes": venda.observacoes,
         "motivo_cancelamento": venda.motivo_cancelamento,
         "cancelada_em": venda.cancelada_em,
+        "transferencia": transferencia_da(venda) if venda.status == StatusVenda.ativa else None,
     }
     if pode(usuario, P.custos_ver):
         dados.update(
@@ -132,5 +155,36 @@ def cancelar(
 ):
     venda = _obter(db, venda_id, usuario)
     servicos.cancelar_venda(db, venda, dados.motivo, usuario)
+    db.commit()
+    return serializar(_obter(db, venda.id, usuario), usuario)
+
+
+@router.post("/{venda_id}/transferencia", response_model=schemas.VendaOut)
+def marcar_transferencia(
+    venda_id: int,
+    dados: schemas.TransferenciaMarcar,
+    usuario: Usuario = Depends(exigir(P.transferencia_gerir)),
+    db: Session = Depends(obter_db),
+):
+    """O comprador passou o veículo para o próprio nome: encerra a contagem dos 30 dias."""
+    venda = _obter(db, venda_id, usuario)
+    if venda.status != StatusVenda.ativa:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta venda está cancelada.")
+    dia = dados.transferida_em or hoje()
+    if dia > hoje() or dia < venda.data_venda:
+        raise HTTPException(422, "A data da transferência deve ficar entre a venda e hoje.")
+    venda.transferida_em = dia
+    db.commit()
+    return serializar(_obter(db, venda.id, usuario), usuario)
+
+
+@router.delete("/{venda_id}/transferencia", response_model=schemas.VendaOut)
+def desfazer_transferencia(
+    venda_id: int,
+    usuario: Usuario = Depends(exigir(P.transferencia_gerir)),
+    db: Session = Depends(obter_db),
+):
+    venda = _obter(db, venda_id, usuario)
+    venda.transferida_em = None
     db.commit()
     return serializar(_obter(db, venda.id, usuario), usuario)

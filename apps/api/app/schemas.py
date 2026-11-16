@@ -20,8 +20,10 @@ from app.models import (
     Semaforo,
     Situacao,
     StatusComissao,
+    StatusDebito,
     StatusVenda,
     TipoCusto,
+    TipoDebito,
     TipoVeiculo,
 )
 
@@ -183,6 +185,31 @@ class CustoOut(Modelo):
     data: date
 
 
+class DebitoCriar(BaseModel):
+    tipo: TipoDebito
+    descricao: Texto = Field(max_length=200)
+    valor: ValorPositivo
+    prazo: date
+
+
+class DebitoPagar(BaseModel):
+    # Padrões: o valor do próprio débito e a data de hoje
+    valor_pago: ValorPositivo | None = None
+    data: date | None = None
+
+
+class DebitoOut(BaseModel):
+    id: int
+    tipo: TipoDebito
+    descricao: str
+    valor: Decimal
+    prazo: date
+    status: StatusDebito
+    pago_em: date | None
+    dias_restantes: int | None  # negativo = vencido; nulo quando já está pago
+    nivel: str  # pago | ok | atencao (≤15 dias) | urgente (≤7) | hoje | vencido
+
+
 class FotoOut(BaseModel):
     id: int
     url: str
@@ -214,7 +241,11 @@ class VeiculoOut(BaseModel):
     situacao: Situacao
     situacao_desde: datetime
     dias_na_situacao: int
+    parado: bool  # há mais tempo na etapa do que o limite configurado
     foto_capa: str | None
+    debitos_abertos: int
+    proximo_prazo: date | None
+    nivel_debito: str | None  # o pior nível entre os débitos abertos
     # Só para quem tem a permissão custos.ver
     valor_compra: Decimal | None = None
     total_custos: Decimal | None = None
@@ -229,6 +260,8 @@ class VeiculoDetalhe(VeiculoOut):
     observacoes: str | None
     fotos: list[FotoOut]
     custos: list[CustoOut] | None = None
+    debitos: list[DebitoOut] | None = None
+    total_debitos_abertos: Decimal | None = None
     venda: VendaDoVeiculo | None = None
 
 
@@ -302,6 +335,19 @@ class VendaCriar(BaseModel):
         return self
 
 
+class TransferenciaMarcar(BaseModel):
+    transferida_em: date | None = None  # padrão: hoje
+
+
+class TransferenciaOut(BaseModel):
+    """Transferência do veículo para o nome do comprador (30 dias a partir da venda)."""
+
+    prazo: date
+    transferida_em: date | None
+    dias_restantes: int  # negativo = prazo vencido
+    situacao: str  # transferida | no_prazo | cobrar | vencida
+
+
 class VendaCancelar(BaseModel):
     motivo: Texto = Field(max_length=300)
 
@@ -338,6 +384,7 @@ class VendaOut(BaseModel):
     observacoes: str | None
     motivo_cancelamento: str | None
     cancelada_em: datetime | None
+    transferencia: TransferenciaOut | None = None
     # custos.ver
     valor_compra: Decimal | None = None
     total_custos: Decimal | None = None
@@ -530,3 +577,29 @@ class ProcedenciaPublica(BaseModel):
     ilustrativo: bool
     itens: list[ItemLaudo]
     historico: list[MarcoHistorico]
+
+
+# ---------- Avisos ----------
+
+
+class AvisoOut(BaseModel):
+    """Um prazo que pede ação: débito do veículo ou transferência pelo comprador."""
+
+    tipo: str  # debito | transferencia
+    nivel: str  # atencao | urgente | hoje | vencido
+    titulo: str
+    detalhe: str
+    prazo: date
+    dias_restantes: int
+    veiculo_id: int
+    veiculo: str
+    venda_id: int | None = None
+    cliente_nome: str | None = None
+    cliente_telefone: str | None = None
+    valor: Decimal | None = None
+
+
+class AvisosOut(BaseModel):
+    itens: list[AvisoOut]
+    total: int
+    urgentes: int  # vencidos, de hoje e urgentes

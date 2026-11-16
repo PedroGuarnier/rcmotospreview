@@ -5,27 +5,32 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app import fotos, procedencia, schemas
+from app.config import obter_config
 from app.db import obter_db
 from app.models import (
     SITUACOES_EM_ESTOQUE,
     SITUACOES_VENDIDO,
     AuditLog,
     CustoVeiculo,
+    DebitoVeiculo,
     FotoVeiculo,
     Situacao,
+    StatusDebito,
+    TipoCusto,
     TipoVeiculo,
     Usuario,
     Veiculo,
     Venda,
 )
 from app.permissoes import P, exigir, pode
-from app.servicos import mudar_situacao, recalcular_venda_do_veiculo
+from app.servicos import NIVEIS, mudar_situacao, nivel_do_debito, recalcular_venda_do_veiculo
 from app.tempo import hoje
 
 router = APIRouter(prefix="/veiculos", tags=["estoque"])
 
 _CARGA = (
     selectinload(Veiculo.custos),
+    selectinload(Veiculo.debitos),
     selectinload(Veiculo.fotos),
     selectinload(Veiculo.vendas).selectinload(Venda.cliente),
     selectinload(Veiculo.vendas).selectinload(Venda.vendedor),
@@ -42,8 +47,25 @@ def _obter(db: Session, veiculo_id: int, *, travar: bool = False) -> Veiculo:
     return veiculo
 
 
+def _debito(debito: DebitoVeiculo) -> schemas.DebitoOut:
+    pago = debito.status == StatusDebito.pago
+    return schemas.DebitoOut(
+        id=debito.id,
+        tipo=debito.tipo,
+        descricao=debito.descricao,
+        valor=debito.valor,
+        prazo=debito.prazo,
+        status=debito.status,
+        pago_em=debito.pago_em,
+        dias_restantes=None if pago else (debito.prazo - hoje()).days,
+        nivel="pago" if pago else nivel_do_debito(debito.prazo, hoje()),
+    )
+
+
 def _resumo(veiculo: Veiculo, com_custos: bool) -> dict:
-    dias = (datetime.now(UTC) - veiculo.situacao_desde).days
+    dias = max((datetime.now(UTC) - veiculo.situacao_desde).days, 0)
+    abertos = veiculo.debitos_abertos
+    niveis = [nivel_do_debito(d.prazo, hoje()) for d in abertos]
     dados = {
         "id": veiculo.id,
         "tipo": veiculo.tipo,
@@ -58,15 +80,23 @@ def _resumo(veiculo: Veiculo, com_custos: bool) -> dict:
         "preco_venda": veiculo.preco_venda,
         "situacao": veiculo.situacao,
         "situacao_desde": veiculo.situacao_desde,
-        "dias_na_situacao": max(dias, 0),
+        "dias_na_situacao": dias,
+        "parado": veiculo.situacao in SITUACOES_EM_ESTOQUE
+        and dias >= obter_config().dias_parado_alerta,
         "foto_capa": fotos.url(veiculo.fotos[0].miniatura) if veiculo.fotos else None,
+        "debitos_abertos": len(abertos),
+        "proximo_prazo": min((d.prazo for d in abertos), default=None),
+        "nivel_debito": min(niveis, key=NIVEIS.index) if niveis else None,
     }
     if com_custos:
         dados["valor_compra"] = veiculo.valor_compra
         dados["total_custos"] = veiculo.total_custos
         dados["custo_total"] = veiculo.custo_total
         if veiculo.preco_venda is not None:
-            dados["lucro_previsto"] = veiculo.preco_venda - veiculo.custo_total
+            # Débito em aberto ainda vai virar custo: já entra na conta do lucro previsto.
+            dados["lucro_previsto"] = (
+                veiculo.preco_venda - veiculo.custo_total - veiculo.total_debitos_abertos
+            )
     return dados
 
 
@@ -85,6 +115,8 @@ def _detalhe(veiculo: Veiculo, usuario: Usuario) -> schemas.VeiculoDetalhe:
     )
     if com_custos:
         dados["custos"] = [schemas.CustoOut.model_validate(c) for c in veiculo.custos]
+        dados["debitos"] = [_debito(d) for d in veiculo.debitos]
+        dados["total_debitos_abertos"] = veiculo.total_debitos_abertos
     venda = veiculo.venda_ativa
     # O vendedor só enxerga os dados da venda se ela for dele.
     if venda is not None and (pode(usuario, P.vendas_ver_todas) or venda.vendedor_id == usuario.id):
@@ -131,6 +163,12 @@ def _conferir_situacao(veiculo: Veiculo, nova: Situacao) -> None:
         raise HTTPException(
             422,
             "Informe o preço de venda antes de colocar o veículo à venda.",
+        )
+    if nova == Situacao.a_venda and veiculo.debitos_abertos:
+        nomes = ", ".join(d.descricao for d in veiculo.debitos_abertos)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Este veículo tem débito em aberto ({nomes}). Quite antes de colocar à venda.",
         )
 
 
@@ -291,6 +329,122 @@ def remover_custo(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Custo não encontrado.")
     veiculo.custos.remove(custo)
     recalcular_venda_do_veiculo(veiculo)
+    db.commit()
+    return _detalhe(_obter(db, veiculo.id), usuario)
+
+
+# ---------- Débitos (IPVA, licenciamento, multas) ----------
+
+
+def _achar_debito(veiculo: Veiculo, debito_id: int) -> DebitoVeiculo:
+    debito = next((d for d in veiculo.debitos if d.id == debito_id), None)
+    if debito is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Débito não encontrado.")
+    return debito
+
+
+@router.post(
+    "/{veiculo_id}/debitos",
+    response_model=schemas.VeiculoDetalhe,
+    status_code=status.HTTP_201_CREATED,
+)
+def lancar_debito(
+    veiculo_id: int,
+    dados: schemas.DebitoCriar,
+    usuario: Usuario = Depends(exigir(P.estoque_editar)),
+    db: Session = Depends(obter_db),
+):
+    veiculo = _obter(db, veiculo_id, travar=True)
+    veiculo.debitos.append(
+        DebitoVeiculo(
+            tipo=dados.tipo,
+            descricao=dados.descricao,
+            valor=dados.valor,
+            prazo=dados.prazo,
+            status=StatusDebito.aberto,
+            registrado_por_id=usuario.id,
+        )
+    )
+    # Veículo com débito aberto não fica à venda: volta para a etapa de documentação.
+    if veiculo.situacao == Situacao.a_venda:
+        mudar_situacao(veiculo, Situacao.documentacao)
+    db.commit()
+    return _detalhe(_obter(db, veiculo.id), usuario)
+
+
+@router.post("/{veiculo_id}/debitos/{debito_id}/pagar", response_model=schemas.VeiculoDetalhe)
+def pagar_debito(
+    veiculo_id: int,
+    debito_id: int,
+    dados: schemas.DebitoPagar,
+    usuario: Usuario = Depends(exigir(P.estoque_editar)),
+    db: Session = Depends(obter_db),
+):
+    """Quita o débito: ele vira custo do veículo, pelo valor realmente pago."""
+    veiculo = _obter(db, veiculo_id, travar=True)
+    debito = _achar_debito(veiculo, debito_id)
+    if debito.status != StatusDebito.aberto:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Este débito já foi pago.")
+    data = dados.data or hoje()
+    if data > hoje():
+        raise HTTPException(422, "A data do pagamento não pode ser futura.")
+    custo = CustoVeiculo(
+        tipo=TipoCusto.debito,
+        descricao=debito.descricao,
+        valor=dados.valor_pago or debito.valor,
+        data=data,
+        registrado_por_id=usuario.id,
+    )
+    veiculo.custos.append(custo)
+    db.flush()
+    debito.status = StatusDebito.pago
+    debito.pago_em = data
+    debito.custo_id = custo.id
+    recalcular_venda_do_veiculo(veiculo)
+    db.commit()
+    return _detalhe(_obter(db, veiculo.id), usuario)
+
+
+@router.post("/{veiculo_id}/debitos/{debito_id}/reabrir", response_model=schemas.VeiculoDetalhe)
+def reabrir_debito(
+    veiculo_id: int,
+    debito_id: int,
+    usuario: Usuario = Depends(exigir(P.estoque_editar)),
+    db: Session = Depends(obter_db),
+):
+    """Desfaz um pagamento marcado por engano: o custo gerado sai e o débito volta a aberto."""
+    veiculo = _obter(db, veiculo_id, travar=True)
+    debito = _achar_debito(veiculo, debito_id)
+    if debito.status != StatusDebito.pago:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Este débito não está pago.")
+    custo = next((c for c in veiculo.custos if c.id == debito.custo_id), None)
+    if custo is not None:
+        veiculo.custos.remove(custo)
+    debito.status = StatusDebito.aberto
+    debito.pago_em = None
+    debito.custo_id = None
+    if veiculo.situacao == Situacao.a_venda:
+        mudar_situacao(veiculo, Situacao.documentacao)
+    recalcular_venda_do_veiculo(veiculo)
+    db.commit()
+    return _detalhe(_obter(db, veiculo.id), usuario)
+
+
+@router.delete("/{veiculo_id}/debitos/{debito_id}", response_model=schemas.VeiculoDetalhe)
+def remover_debito(
+    veiculo_id: int,
+    debito_id: int,
+    usuario: Usuario = Depends(exigir(P.estoque_editar)),
+    db: Session = Depends(obter_db),
+):
+    veiculo = _obter(db, veiculo_id, travar=True)
+    debito = _achar_debito(veiculo, debito_id)
+    if debito.status == StatusDebito.pago:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Débito já pago: reabra o débito antes de excluir (o custo gerado sai junto).",
+        )
+    veiculo.debitos.remove(debito)
     db.commit()
     return _detalhe(_obter(db, veiculo.id), usuario)
 

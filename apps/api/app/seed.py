@@ -20,11 +20,13 @@ from app.db import SessionLocal
 from app.models import (
     Aporte,
     CustoVeiculo,
+    DebitoVeiculo,
     FormaPagamento,
     Perfil,
     RegraComissao,
     Situacao,
     TipoCusto,
+    TipoDebito,
     TipoVeiculo,
     Usuario,
     Veiculo,
@@ -304,7 +306,7 @@ def criar_demo(db, dono: Usuario) -> None:
     # Vendas de exemplo: (índice do veículo, vendedor, valor, forma, dias atrás)
     vendas = [
         (7, v1, 17500, FormaPagamento.a_vista, 3),
-        (8, v2, 19500, FormaPagamento.financiado_banco, 9),
+        (8, v2, 19500, FormaPagamento.financiado_banco, 12),
         (9, v1, 28000, FormaPagamento.parcelado_loja, 38),
     ]
     for i, (indice, vendedor, valor, forma, dias) in enumerate(vendas, start=1):
@@ -332,6 +334,23 @@ def criar_demo(db, dono: Usuario) -> None:
                 **extras,
             ),
             dono,
+        )
+    # Débitos em aberto em pontos diferentes do aviso: (veículo, tipo, texto, valor, dias)
+    debitos = [
+        (3, TipoDebito.ipva, "IPVA 2026", 160, 40),
+        (4, TipoDebito.licenciamento, "Licenciamento 2026", 180, 6),
+        (6, TipoDebito.ipva, "IPVA 2026", 1240, 13),
+        (6, TipoDebito.multa, "Multa de trânsito", 195, -2),
+    ]
+    for indice, tipo, descricao, valor, dias in debitos:
+        veiculos[indice].debitos.append(
+            DebitoVeiculo(
+                tipo=tipo,
+                descricao=descricao,
+                valor=Decimal(valor),
+                prazo=dia + timedelta(days=dias),
+                registrado_por_id=dono.id,
+            )
         )
     # Laudos de procedência ilustrativos para o que está à venda (provedor de demonstração)
     if procedencia.provedor_ativo() == "demonstracao":

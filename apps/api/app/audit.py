@@ -20,6 +20,7 @@ from app.models import (
     Cliente,
     Comissao,
     CustoVeiculo,
+    DebitoVeiculo,
     FotoVeiculo,
     LaudoProcedencia,
     Usuario,
@@ -31,6 +32,7 @@ ENTIDADES: dict[type, str] = {
     Usuario: "usuario",
     Veiculo: "veiculo",
     CustoVeiculo: "custo",
+    DebitoVeiculo: "debito",
     FotoVeiculo: "foto",
     Cliente: "cliente",
     Venda: "venda",
@@ -67,7 +69,7 @@ def _rotulo(obj: Any) -> str:
         return obj.descricao
     if isinstance(obj, Usuario | Cliente):
         return obj.nome
-    if isinstance(obj, CustoVeiculo | Aporte):
+    if isinstance(obj, CustoVeiculo | DebitoVeiculo | Aporte):
         return obj.descricao
     if isinstance(obj, LaudoProcedencia):
         return f"da placa {obj.placa}"
