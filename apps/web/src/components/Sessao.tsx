@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ErroApi, api, buscar } from "@/lib/api";
 import { PERFIL } from "@/lib/formato";
-import type { Eu, Permissao } from "@/lib/tipos";
+import type { Avisos, Eu, Permissao } from "@/lib/tipos";
 import { Carregando } from "./ui";
 
 const Contexto = createContext<Eu | null>(null);
@@ -52,6 +52,14 @@ const ICONES = {
       <path d="M2.5 9.5h19M7 14h2M11 14h2M15 14h2" />
     </>
   ),
+  linha: (
+    <>
+      <rect x="3" y="4" width="5" height="16" rx="1.5" />
+      <rect x="9.5" y="4" width="5" height="11" rx="1.5" />
+      <rect x="16" y="4" width="5" height="7" rx="1.5" />
+    </>
+  ),
+  avisos: <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9Zm4 10.5a2.2 2.2 0 0 0 4 0" />,
   aportes: <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16" />,
   equipe: (
     <>
@@ -72,6 +80,21 @@ const ICONES = {
     </>
   ),
 } as const;
+
+/** Bolinha com o número de avisos; vermelha quando há algo vencido ou para hoje. */
+function Contador({ avisos }: { avisos: Avisos | undefined }) {
+  if (!avisos || avisos.total === 0) return null;
+  return (
+    <span
+      className={`ml-auto grid min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold leading-5 ${
+        avisos.urgentes > 0 ? "bg-vermelho text-white" : "bg-amarelo text-tinta"
+      }`}
+      aria-label={`${avisos.total} ${avisos.total === 1 ? "aviso pendente" : "avisos pendentes"}`}
+    >
+      {avisos.total}
+    </span>
+  );
+}
 
 function Icone({ nome }: { nome: keyof typeof ICONES }) {
   return (
@@ -97,11 +120,15 @@ interface ItemMenu {
   permissao?: Permissao;
   /** aparece na barra inferior do celular */
   principal?: boolean;
+  /** mostra a contagem de avisos pendentes */
+  avisos?: boolean;
 }
 
 const MENU: ItemMenu[] = [
   { href: "/painel", rotulo: "Painel", icone: "painel", permissao: "painel.ver", principal: true },
   { href: "/estoque", rotulo: "Estoque", icone: "estoque", permissao: "estoque.ver", principal: true },
+  { href: "/linha", rotulo: "Linha do veículo", icone: "linha", permissao: "estoque.ver" },
+  { href: "/avisos", rotulo: "Avisos", icone: "avisos", avisos: true },
   { href: "/procedencia", rotulo: "Procedência", icone: "procedencia", permissao: "procedencia.consultar" },
   { href: "/vendas", rotulo: "Vendas", icone: "vendas", principal: true },
   { href: "/comissoes", rotulo: "Comissões", icone: "comissoes", principal: true },
@@ -123,6 +150,9 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
     shouldRetryOnError: false,
     revalidateOnFocus: true,
   });
+
+  // Prazos pendentes (débitos e transferências): conferidos de novo a cada minuto
+  const { data: avisos } = useSWR<Avisos>(eu ? "/avisos" : null, buscar, { refreshInterval: 60_000 });
 
   const deslogado = error instanceof ErroApi && error.status === 401;
   useEffect(() => {
@@ -177,6 +207,7 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
               >
                 <Icone nome={item.icone} />
                 {item.rotulo}
+                {item.avisos && <Contador avisos={avisos} />}
               </Link>
             ))}
           </nav>
@@ -199,8 +230,9 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
               </span>
             </Link>
             <details className="relative">
-              <summary className="cursor-pointer list-none rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
                 Menu
+                <Contador avisos={avisos} />
               </summary>
               <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white p-2 text-tinta shadow-xl">
                 <p className="border-b border-borda px-3 pb-2 pt-1 text-sm">

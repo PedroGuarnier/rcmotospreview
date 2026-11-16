@@ -1,10 +1,12 @@
 import type {
   FormaPagamento,
+  NivelPrazo,
   Perfil,
   RegraComissao,
   Situacao,
   StatusComissao,
   TipoCusto,
+  TipoDebito,
   TipoVeiculo,
 } from "./tipos";
 
@@ -170,3 +172,39 @@ export const COR_SITUACAO: Record<Situacao, "azul" | "verde" | "amarelo" | "cinz
   pos_venda: "verde",
   concluido: "cinza",
 };
+
+export const TIPO_DEBITO: Record<TipoDebito, string> = {
+  ipva: "IPVA",
+  licenciamento: "Licenciamento",
+  multa: "Multa",
+  outro: "Outro débito",
+};
+
+export const COR_NIVEL: Record<NivelPrazo, "verde" | "cinza" | "amarelo" | "laranja" | "vermelho"> = {
+  pago: "verde",
+  ok: "cinza",
+  atencao: "amarelo",
+  urgente: "laranja",
+  hoje: "vermelho",
+  vencido: "vermelho",
+};
+
+/** "vence em 6 dias", "vence hoje", "venceu há 2 dias" */
+export function prazoEmPalavras(diasRestantes: number): string {
+  if (diasRestantes < 0) return `venceu há ${-diasRestantes} ${diasRestantes === -1 ? "dia" : "dias"}`;
+  if (diasRestantes === 0) return "vence hoje";
+  return `vence em ${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"}`;
+}
+
+/** Link do WhatsApp para um cliente (telefone só com dígitos e DDD), com mensagem pronta. */
+export function whatsappCliente(telefone: string, mensagem: string): string {
+  return `https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`;
+}
+
+/** Mensagem pronta para a equipe cobrar a transferência pelo WhatsApp do cliente. */
+export function mensagemDeTransferencia(nome: string, veiculo: string, prazo: string, diasRestantes: number) {
+  const primeiro = nome.split(" ")[0];
+  const quando =
+    diasRestantes < 0 ? `venceu em ${data(prazo)}` : diasRestantes === 0 ? "vence hoje" : `vai até ${data(prazo)}`;
+  return `Olá, ${primeiro}! Aqui é da RC Motos. O prazo de 30 dias para passar ${veiculo} para o seu nome ${quando}. Você já conseguiu fazer a transferência? Se precisar de ajuda com a documentação, é só falar.`;
+}

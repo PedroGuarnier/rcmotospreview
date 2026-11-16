@@ -6,8 +6,8 @@ import { GraficoMeses } from "@/components/GraficoMeses";
 import { Exigir } from "@/components/Sessao";
 import { Aviso, Carregando, Cartao, Etiqueta, Titulo } from "@/components/ui";
 import { buscar, mensagemDe } from "@/lib/api";
-import { COR_SITUACAO, SITUACAO, SITUACOES_ESTOQUE, mesLongo, moeda } from "@/lib/formato";
-import type { Painel } from "@/lib/tipos";
+import { COR_NIVEL, COR_SITUACAO, SITUACAO, SITUACOES_ESTOQUE, mesLongo, moeda } from "@/lib/formato";
+import type { Avisos, Painel } from "@/lib/tipos";
 
 function Numero({
   rotulo,
@@ -41,6 +41,7 @@ function Numero({
 function Conteudo() {
   // Atualiza sozinho a cada 30 s: faturamento e lucro "em tempo real".
   const { data: p, error } = useSWR<Painel>("/painel", buscar, { refreshInterval: 30_000 });
+  const { data: avisos } = useSWR<Avisos>("/avisos", buscar);
   if (error) return <Aviso>{mensagemDe(error)}</Aviso>;
   if (!p) return <Carregando />;
 
@@ -53,6 +54,30 @@ function Conteudo() {
   return (
     <>
       <Titulo sobre={mesLongo(mes.mes)}>Painel</Titulo>
+
+      {avisos && avisos.total > 0 && (
+        <Link
+          href="/avisos"
+          className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-4 hover:border-azul ${
+            avisos.urgentes > 0 ? "border-vermelho/40 bg-vermelho/5" : "border-borda bg-white"
+          }`}
+        >
+          <span className="min-w-0">
+            <b>
+              {avisos.total} {avisos.total === 1 ? "prazo pede ação" : "prazos pedem ação"}
+            </b>
+            <span className="mt-1 flex flex-wrap gap-1.5">
+              {avisos.itens.slice(0, 3).map((a) => (
+                <Etiqueta key={`${a.tipo}-${a.venda_id ?? a.veiculo_id}-${a.titulo}`} cor={COR_NIVEL[a.nivel]}>
+                  {a.titulo}
+                </Etiqueta>
+              ))}
+              {avisos.total > 3 && <Etiqueta>+{avisos.total - 3}</Etiqueta>}
+            </span>
+          </span>
+          <span className="text-sm font-semibold text-azul">Ver avisos →</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Numero

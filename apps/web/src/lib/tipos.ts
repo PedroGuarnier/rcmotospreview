@@ -23,6 +23,7 @@ export type Permissao =
   | "vendas.registrar"
   | "vendas.ver_todas"
   | "vendas.cancelar"
+  | "transferencia.gerir"
   | "clientes.ver"
   | "comissoes.ver_todas"
   | "comissoes.pagar"
@@ -68,11 +69,59 @@ export interface Veiculo {
   situacao: Situacao;
   situacao_desde: string;
   dias_na_situacao: number;
+  parado: boolean;
   foto_capa: string | null;
+  debitos_abertos: number;
+  proximo_prazo: string | null;
+  nivel_debito: NivelPrazo | null;
   valor_compra: string | null;
   total_custos: string | null;
   custo_total: string | null;
   lucro_previsto: string | null;
+}
+
+export type TipoDebito = "ipva" | "licenciamento" | "multa" | "outro";
+/** Urgência de um prazo. "ok" = ainda longe; "pago" = resolvido. */
+export type NivelPrazo = "pago" | "ok" | "atencao" | "urgente" | "hoje" | "vencido";
+
+export interface Debito {
+  id: number;
+  tipo: TipoDebito;
+  descricao: string;
+  valor: string;
+  prazo: string;
+  status: "aberto" | "pago";
+  pago_em: string | null;
+  dias_restantes: number | null;
+  nivel: NivelPrazo;
+}
+
+export interface Transferencia {
+  prazo: string;
+  transferida_em: string | null;
+  dias_restantes: number;
+  situacao: "transferida" | "no_prazo" | "cobrar" | "vencida";
+}
+
+export interface Aviso {
+  tipo: "debito" | "transferencia";
+  nivel: Exclude<NivelPrazo, "pago" | "ok">;
+  titulo: string;
+  detalhe: string;
+  prazo: string;
+  dias_restantes: number;
+  veiculo_id: number;
+  veiculo: string;
+  venda_id: number | null;
+  cliente_nome: string | null;
+  cliente_telefone: string | null;
+  valor: string | null;
+}
+
+export interface Avisos {
+  itens: Aviso[];
+  total: number;
+  urgentes: number;
 }
 
 export interface Custo {
@@ -96,6 +145,8 @@ export interface VeiculoDetalhe extends Veiculo {
   observacoes: string | null;
   fotos: Foto[];
   custos: Custo[] | null;
+  debitos: Debito[] | null;
+  total_debitos_abertos: string | null;
   venda: {
     id: number;
     data_venda: string;
@@ -140,6 +191,7 @@ export interface Venda {
   primeiro_vencimento: string | null;
   observacoes: string | null;
   motivo_cancelamento: string | null;
+  transferencia: Transferencia | null;
   cancelada_em: string | null;
   valor_compra: string | null;
   total_custos: string | null;

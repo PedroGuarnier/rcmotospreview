@@ -4,6 +4,7 @@ import type { Evento, Situacao } from "@/lib/tipos";
 const ENTIDADE: Record<string, string> = {
   veiculo: "veículo",
   custo: "custo",
+  debito: "débito",
   foto: "foto",
   cliente: "cliente",
   venda: "venda",
@@ -58,6 +59,9 @@ const CAMPO: Record<string, string> = {
   paga_em: "paga em",
   ordem: "ordem",
   semaforo: "sinal",
+  prazo: "prazo",
+  pago_em: "pago em",
+  transferida_em: "transferida em",
   ilustrativo: "ilustrativo",
 };
 
@@ -66,10 +70,15 @@ const DINHEIRO = new Set([
 ]);
 const OCULTOS = new Set([
   "veiculo_id", "cliente_id", "vendedor_id", "venda_id", "registrada_por_id", "registrado_por_id",
-  "cancelada_por_id", "cancelada_em", "consultado_por_id", "provedor", "arquivo", "miniatura", "regra", "regra_valor", "ordem",
+  "cancelada_por_id", "cancelada_em", "consultado_por_id", "provedor", "custo_id", "arquivo", "miniatura", "regra", "regra_valor", "ordem",
 ]);
 
 const VALOR: Record<string, string> = {
+  ipva: "IPVA",
+  licenciamento: "licenciamento",
+  multa: "multa",
+  aberto: "aberto",
+  pago: "pago",
   moto: "moto",
   carro: "carro",
   manutencao: "manutenção",

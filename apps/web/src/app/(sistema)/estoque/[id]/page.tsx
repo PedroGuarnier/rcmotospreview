@@ -23,6 +23,7 @@ import {
 } from "@/components/ui";
 import { ErroApi, api, buscar, mensagemDe } from "@/lib/api";
 import {
+  COR_NIVEL,
   COR_SITUACAO,
   FORMA,
   SITUACAO,
@@ -30,14 +31,16 @@ import {
   SITUACOES_VENDIDO,
   TIPO,
   TIPO_CUSTO,
+  TIPO_DEBITO,
   data,
   hojeIso,
   moeda,
   numero,
   placa,
+  prazoEmPalavras,
   valorParaApi,
 } from "@/lib/formato";
-import type { Evento, Laudo, Situacao, TipoCusto, VeiculoDetalhe } from "@/lib/tipos";
+import type { Evento, Laudo, Situacao, TipoCusto, TipoDebito, VeiculoDetalhe } from "@/lib/tipos";
 
 function Dado({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -169,6 +172,141 @@ function Fotos({ v, aoMudar }: { v: VeiculoDetalhe; aoMudar: (v: VeiculoDetalhe)
         </Modal>
       )}
     </Secao>
+  );
+}
+
+function Debitos({ v, aoMudar }: { v: VeiculoDetalhe; aoMudar: (v: VeiculoDetalhe) => void }) {
+  const pode = usePode();
+  const editar = pode("estoque.editar");
+  const [tipo, setTipo] = useState<TipoDebito>("ipva");
+  const [descricao, setDescricao] = useState("");
+  const [valor, setValor] = useState("");
+  const [prazo, setPrazo] = useState("");
+  const { ocupado, erro, executar } = useAcao();
+  if (v.debitos === null) return null;
+
+  const chamar = (caminho: string, metodo: string, corpo?: unknown) =>
+    executar(async () => aoMudar(await api<VeiculoDetalhe>(`/veiculos/${v.id}/debitos${caminho}`, { metodo, corpo })));
+
+  function lancar(e: React.FormEvent) {
+    e.preventDefault();
+    executar(async () => {
+      aoMudar(
+        await api<VeiculoDetalhe>(`/veiculos/${v.id}/debitos`, {
+          corpo: { tipo, descricao, valor: valorParaApi(valor), prazo },
+        }),
+      );
+      setDescricao("");
+      setValor("");
+      setPrazo("");
+    });
+  }
+
+  return (
+    <div id="debitos" className="scroll-mt-20">
+      <Secao titulo="Débitos do veículo">
+        <p className="-mt-2 mb-4 text-sm text-suave">
+          IPVA, licenciamento e multas que vieram com o veículo. Com débito em aberto ele não vai para “à venda”;
+          ao pagar, o valor entra nos custos.
+        </p>
+        {v.debitos.length > 0 && (
+          <ul className="mb-4 divide-y divide-borda">
+            {v.debitos.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3 text-sm">
+                <div className="min-w-0 flex-1 basis-52">
+                  <p className="font-medium">
+                    {d.descricao} <span className="font-normal text-suave">· {TIPO_DEBITO[d.tipo]}</span>
+                  </p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-suave">
+                    <Etiqueta cor={COR_NIVEL[d.nivel]}>
+                      {d.status === "pago"
+                        ? `Pago em ${data(d.pago_em)}`
+                        : prazoEmPalavras(d.dias_restantes ?? 0).replace(/^v/, "V")}
+                    </Etiqueta>
+                    {d.status === "aberto" && <>prazo {data(d.prazo)}</>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="num font-semibold">{moeda(d.valor)}</span>
+                  {editar && d.status === "aberto" && (
+                    <>
+                      <Botao
+                        pequeno
+                        disabled={ocupado}
+                        onClick={() => {
+                          const pago = prompt(
+                            `Valor pago em "${d.descricao}" (com juros, se houver):`,
+                            Number(d.valor).toFixed(2).replace(".", ","),
+                          );
+                          if (pago === null) return;
+                          chamar(`/${d.id}/pagar`, "POST", { valor_pago: valorParaApi(pago) });
+                        }}
+                      >
+                        Marcar pago
+                      </Botao>
+                      <button
+                        type="button"
+                        aria-label={`Excluir débito ${d.descricao}`}
+                        disabled={ocupado}
+                        onClick={() => confirm(`Excluir o débito "${d.descricao}"?`) && chamar(`/${d.id}`, "DELETE")}
+                        className="grid size-8 place-items-center rounded-full text-suave hover:bg-vermelho/10 hover:text-vermelho"
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
+                  {editar && d.status === "pago" && (
+                    <Botao tom="fantasma" pequeno disabled={ocupado} onClick={() => chamar(`/${d.id}/reabrir`, "POST")}>
+                      Desfazer
+                    </Botao>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {Number(v.total_debitos_abertos) > 0 && (
+          <p className="num mb-4 rounded-xl bg-gelo px-4 py-3 text-sm">
+            Em aberto: <b>{moeda(v.total_debitos_abertos)}</b>
+            <span className="text-suave"> — já descontado do lucro previsto.</span>
+          </p>
+        )}
+        <Aviso>{erro}</Aviso>
+
+        {editar && (
+          <form onSubmit={lancar} className="mt-4 space-y-3 border-t border-borda pt-5">
+            <h3 className="text-sm font-bold">Lançar débito</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Selecao
+                rotulo="Tipo"
+                valor={tipo}
+                aoMudar={setTipo}
+                opcoes={(Object.keys(TIPO_DEBITO) as TipoDebito[]).map((t) => ({ valor: t, rotulo: TIPO_DEBITO[t] }))}
+              />
+              <Campo
+                rotulo="Descrição"
+                placeholder="Ex.: IPVA 2026"
+                required
+                maxLength={200}
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+              />
+              <CampoValor rotulo="Valor" valor={valor} aoMudar={setValor} required />
+              <Campo
+                rotulo="Prazo para resolver"
+                type="date"
+                required
+                value={prazo}
+                onChange={(e) => setPrazo(e.target.value)}
+              />
+            </div>
+            <Botao type="submit" tom="neutro" ocupado={ocupado}>
+              Lançar débito
+            </Botao>
+          </form>
+        )}
+      </Secao>
+    </div>
   );
 }
 
@@ -504,6 +642,8 @@ function Veiculo() {
         </Secao>
 
         <Procedencia v={v} />
+
+        <Debitos v={v} aoMudar={atualizar} />
 
         <Custos v={v} aoMudar={atualizar} />
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { usePode } from "@/components/Sessao";
 import { Aviso, Botao, Campo, Carregando, Cartao, Etiqueta, Modal, SeletorMes, Titulo, Vazio, useAcao } from "@/components/ui";
 import { api, buscar, mensagemDe } from "@/lib/api";
@@ -10,12 +10,15 @@ import {
   FORMA,
   cpfCnpj,
   data,
+  mensagemDeTransferencia,
   mesAtual,
   mesLongo,
   mesVizinho,
   moeda,
+  prazoEmPalavras,
   regraDescrita,
   telefone,
+  whatsappCliente,
 } from "@/lib/formato";
 import type { Venda } from "@/lib/tipos";
 
@@ -28,7 +31,73 @@ function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode
   );
 }
 
-function DetalheVenda({ venda, aoFechar, aoMudar }: { venda: Venda; aoFechar: () => void; aoMudar: () => void }) {
+const COR_TRANSFERENCIA = { transferida: "verde", no_prazo: "cinza", cobrar: "amarelo", vencida: "vermelho" } as const;
+
+function BlocoTransferencia({ venda, aoMudar }: { venda: Venda; aoMudar: (v: Venda) => void }) {
+  const pode = usePode();
+  const { ocupado, erro, executar } = useAcao();
+  const t = venda.transferencia;
+  if (!t) return null;
+  const rotulo =
+    t.situacao === "transferida"
+      ? `Transferida em ${data(t.transferida_em)}`
+      : `Prazo ${data(t.prazo)} · ${prazoEmPalavras(t.dias_restantes)}`;
+  const mudar = (metodo: "POST" | "DELETE") =>
+    executar(async () =>
+      aoMudar(await api<Venda>(`/vendas/${venda.id}/transferencia`, { metodo, corpo: metodo === "POST" ? {} : undefined })),
+    );
+
+  return (
+    <div className="mt-5 rounded-xl bg-gelo px-4 py-3.5 text-sm">
+      <p className="flex flex-wrap items-center gap-2">
+        <b>Transferência para o comprador</b>
+        <Etiqueta cor={COR_TRANSFERENCIA[t.situacao]}>{rotulo}</Etiqueta>
+      </p>
+      {t.situacao !== "transferida" && (
+        <p className="mt-1 text-xs text-suave">O comprador tem 30 dias, a partir da venda, para passar o veículo para o nome dele.</p>
+      )}
+      {erro && <p className="mt-2 font-medium text-vermelho">{erro}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {t.situacao !== "transferida" && venda.cliente.telefone && (
+          <a
+            href={whatsappCliente(
+              venda.cliente.telefone,
+              mensagemDeTransferencia(venda.cliente.nome, venda.veiculo.descricao, t.prazo, t.dias_restantes),
+            )}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex min-h-9 items-center rounded-full bg-verde px-3.5 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Cobrar no WhatsApp
+          </a>
+        )}
+        {pode("transferencia.gerir") &&
+          (t.situacao === "transferida" ? (
+            <Botao tom="fantasma" pequeno ocupado={ocupado} onClick={() => mudar("DELETE")}>
+              Desfazer
+            </Botao>
+          ) : (
+            <Botao tom="neutro" pequeno ocupado={ocupado} onClick={() => mudar("POST")}>
+              Marcar como transferida
+            </Botao>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+function DetalheVenda({
+  venda,
+  aoFechar,
+  aoMudar,
+  aoTrocar,
+}: {
+  venda: Venda;
+  aoFechar: () => void;
+  aoMudar: () => void;
+  /** a venda mudou e continua aberta (ex.: transferência marcada) */
+  aoTrocar: (venda: Venda) => void;
+}) {
   const pode = usePode();
   const [cancelando, setCancelando] = useState(false);
   const [motivo, setMotivo] = useState("");
@@ -91,6 +160,8 @@ function DetalheVenda({ venda, aoFechar, aoMudar }: { venda: Venda; aoFechar: ()
         )}
       </dl>
 
+      <BlocoTransferencia venda={venda} aoMudar={aoTrocar} />
+
       {venda.status === "ativa" && pode("vendas.cancelar") && (
         <div className="mt-5 border-t border-borda pt-4">
           {cancelando ? (
@@ -130,6 +201,7 @@ export default function Vendas() {
   const [mes, setMes] = useState(mesAtual());
   const [canceladas, setCanceladas] = useState(false);
   const [aberta, setAberta] = useState<Venda | null>(null);
+  const { mutate: atualizarAvisos } = useSWRConfig();
   const { data: vendas, error, mutate } = useSWR<Venda[]>(
     `/vendas?mes=${mes}${canceladas ? "&incluir_canceladas=true" : ""}`,
     buscar,
@@ -218,6 +290,10 @@ export default function Vendas() {
                     </span>
                     {v.status === "cancelada" ? (
                       <Etiqueta cor="vermelho">Cancelada</Etiqueta>
+                    ) : v.transferencia && ["cobrar", "vencida"].includes(v.transferencia.situacao) ? (
+                      <Etiqueta cor={COR_TRANSFERENCIA[v.transferencia.situacao]}>
+                        {v.transferencia.situacao === "vencida" ? "Transferência vencida" : "Cobrar transferência"}
+                      </Etiqueta>
                     ) : (
                       <span className="text-xs text-suave">{FORMA[v.forma]}</span>
                     )}
@@ -229,7 +305,18 @@ export default function Vendas() {
         </>
       )}
 
-      {aberta && <DetalheVenda venda={aberta} aoFechar={() => setAberta(null)} aoMudar={() => mutate()} />}
+      {aberta && (
+        <DetalheVenda
+          venda={aberta}
+          aoFechar={() => setAberta(null)}
+          aoMudar={() => mutate()}
+          aoTrocar={(nova) => {
+            setAberta(nova);
+            mutate();
+            atualizarAvisos("/avisos");
+          }}
+        />
+      )}
     </>
   );
 }

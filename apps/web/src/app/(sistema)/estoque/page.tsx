@@ -8,7 +8,7 @@ import { Exigir, usePode } from "@/components/Sessao";
 import { VenderModal } from "@/components/VenderModal";
 import { Aviso, Botao, Carregando, Etiqueta, Titulo, Vazio } from "@/components/ui";
 import { buscar, mensagemDe } from "@/lib/api";
-import { COR_SITUACAO, SITUACAO, moeda, numero, placa } from "@/lib/formato";
+import { COR_NIVEL, COR_SITUACAO, SITUACAO, moeda, numero, placa } from "@/lib/formato";
 import type { Situacao, TipoVeiculo, Veiculo } from "@/lib/tipos";
 
 type Filtro = "estoque" | "vendidos" | Situacao;
@@ -48,10 +48,15 @@ function CartaoVeiculo({ v, aoVender }: { v: Veiculo; aoVender?: () => void }) {
           ) : (
             <div className="grid size-full place-items-center text-sm text-suave">Sem foto</div>
           )}
-          <span className="absolute left-3 top-3">
+          <span className="absolute left-3 top-3 flex flex-wrap gap-1.5">
             <Etiqueta sobreFoto cor={COR_SITUACAO[v.situacao]}>
               {SITUACAO[v.situacao]}
             </Etiqueta>
+            {v.debitos_abertos > 0 && v.nivel_debito && (
+              <Etiqueta sobreFoto cor={COR_NIVEL[v.nivel_debito]}>
+                {v.debitos_abertos} {v.debitos_abertos === 1 ? "débito" : "débitos"}
+              </Etiqueta>
+            )}
           </span>
         </div>
         <div className="px-4 pt-3">
