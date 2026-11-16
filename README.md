@@ -18,8 +18,11 @@ pela placa. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`]
 | Aportes (gastos pessoais investidos na loja), visíveis só a quem o dono habilitar | pronto |
 | Site público: vitrine sincronizada com o estoque, WhatsApp por veículo, SEO local | pronto |
 | Procedência pela placa: tela de consulta, semáforo, laudo salvo no veículo | pronto, **sem provedor real ainda** (ver abaixo) |
+| Linha do veículo: quadro por etapa, com os parados em destaque | pronto |
+| Débitos do veículo (IPVA, licenciamento, multas) com prazo e avisos | pronto |
+| Transferência pelo comprador: contagem de 30 dias, aviso e cobrança por WhatsApp | pronto, **sem envio automático e sem a notificação extrajudicial** (ver abaixo) |
 | Assistente de IA | a fazer (próximo passo) |
-| Asaas, cobrança, WhatsApp/Instagram com IA, linha do veículo, voz | a fazer |
+| Asaas, cobrança, WhatsApp/Instagram com IA, gravame, RENAVE, voz | a fazer |
 
 O `index.html` na raiz é a prévia antiga do site mostrada ao cliente; o site de verdade é a
 página inicial de `apps/web`.
@@ -166,7 +169,30 @@ interface recebe a lista pronta em `/auth/eu` (não há regra duplicada no front
 
 Consultar procedência: dono e gerente. Ver o laudo já salvo de um veículo: todos.
 
+Débitos do veículo: dono e gerente lançam, pagam e veem os valores; os demais só veem que
+existe débito. Marcar a transferência do veículo vendido: dono, gerente e financeiro.
+
 Aportes: só o dono e quem ele marcar em **Equipe → Pode ver os aportes**.
+
+## Prazos e avisos
+
+A página **Avisos** (com contador no menu e resumo no painel) junta os prazos que pedem ação.
+Não existe tabela de avisos: a lista é calculada na hora a partir das datas, então some sozinha
+quando o problema é resolvido.
+
+- **Débitos do veículo** (IPVA, licenciamento, multas): lançados na página do veículo, com a
+  data-limite que a equipe informar. Aparecem nos avisos faltando 15 dias, 7 dias, no dia e
+  depois de vencidos. Veículo com débito em aberto não vai para "à venda"; se um débito for
+  lançado num veículo que já está à venda, ele volta para "documentação" (e sai do site).
+  Ao marcar como pago, o valor realmente pago entra nos custos do veículo.
+- **Transferência pelo comprador**: 30 dias a partir da data da venda
+  (`PRAZO_TRANSFERENCIA_DIAS`). Entra nos avisos no 10º dia e fica mais urgente no 25º e no
+  vencimento, até alguém marcar "já transferiu". O botão **Cobrar no WhatsApp** abre a conversa
+  com o cliente com a mensagem pronta — é a equipe que envia.
+- **Ainda falta** (depende de terceiros): o lembrete automático por WhatsApp nos dias 10, 20 e 25
+  (API da Meta) e a geração da notificação extrajudicial (modelo do advogado da loja).
+- **Quadro "Linha do veículo"**: uma coluna por etapa, com dias na etapa, débitos e o botão de
+  avançar. "Parado" é quem está há mais de `DIAS_PARADO_ALERTA` dias na mesma etapa.
 
 ## Regras de negócio que valem saber
 
@@ -236,6 +262,7 @@ Docker (`.env` na raiz): veja [`.env.example`](.env.example).
 | `DADOS_DEMO` | mostra o aviso "números ilustrativos" | `false` |
 | `PROCEDENCIA_PROVEDOR` | provedor da consulta de placa (vazio = desligada) | vazio |
 | `DIAS_PARADO_ALERTA` | dias na mesma etapa para aparecer em "parados" | 45 |
+| `PRAZO_TRANSFERENCIA_DIAS` | prazo do comprador para transferir o veículo | 30 |
 | `FUSO_HORARIO` | fuso da loja | `America/Fortaleza` |
 
 | Variável (web) | Para quê | Padrão |

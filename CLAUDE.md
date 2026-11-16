@@ -85,8 +85,10 @@ Plataforma sob medida para a RC Motos, loja de motos e carros no Piauí. Desenvo
 - Desenvolver o Asaas contra o sandbox com datas simuladas para rodar a régua inteira em minutos.
 - Números de exemplo em telas/demos devem ser marcados como ilustrativos.
 
-## Estado do código (atualizado em 10/11/2026)
+## Estado do código (atualizado em 16/11/2026)
 - Feito: itens 1 e 2 da ordem sugerida (base, auth/perfis, audit log, estoque, vendas, lucro, comissões, painel, aportes); o site público (item 6, sem a IA de atendimento); e a procedência pela placa (telas, semáforo, laudo no veículo) — **ainda sem provedor real**, só o de demonstração. Próximo: assistente de IA; adaptador do provedor de placa quando a conta da loja existir.
+- Feito em 16/11 (pedidos da loja, item 7 em parte): quadro da linha do veículo (`/linha`), débitos do veículo com prazo (`debitos_veiculo`), transferência em 30 dias (`vendas.transferida_em`) e a página de avisos (`/avisos`, calculada na hora, sem tabela). Faltam: lembrete automático por WhatsApp, notificação extrajudicial (modelo do advogado), gravame e RENAVE.
+- Infosimples (lido em 16/11): não tem consulta só pela placa para o PI nem base de leilão; roubo/furto, leilão e Renajud juntos só na consulta do SENATRAN, que exige gov.br + certificado e vale para veículo na posse de quem loga. Serve bem para débitos do PI (DETRAN/PI e SEFAZ/PI, por placa + RENAVAM). Não tem negativação (Serasa/SPC). Mínimo de R$ 100,00/mês, pré-pago.
 - Site público = página inicial de `apps/web` (`src/components/site/`, conceito visual "O Farol"); sistema da equipe em `/login`. `index.html` na raiz é só a prévia antiga.
 - Dados da loja no site vêm de `LOJA_*` (nunca escrever telefone/endereço no código). O site não inventa número, depoimento nem taxa de juros.
 - Rotas `/publico/*` da API não têm login: só pode sair delas o que é público (sem custos, chassi, RENAVAM, comprador, placa completa em listagem).
