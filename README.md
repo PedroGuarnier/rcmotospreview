@@ -3,7 +3,9 @@
 Sistema sob medida da RC Motos (loja de motos e carros no Piauí): estoque, vendas, lucro,
 comissões e painel — com login individual, hierarquia de acesso e histórico de tudo o que é
 feito — e o site público da loja, com a vitrine ligada ao estoque e o laudo de procedência
-pela placa. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`](CLAUDE.md).
+pela placa. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`](CLAUDE.md);
+a visão geral do projeto (o que existe, o que falta, decisões e pendências) está em
+[`CONTEXTO.md`](CONTEXTO.md).
 
 ## O que já está pronto
 
