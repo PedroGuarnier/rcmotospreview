@@ -31,9 +31,15 @@ export function numero(valor: number | null | undefined): string {
   return valor === null || valor === undefined ? "—" : NUMERO.format(valor);
 }
 
-/** "2026-11-10" → "10/11/2026" (sem passar por fuso horário) */
+/**
+ * "2026-11-10" → "10/11/2026". Uma data pura não passa por fuso; um instante
+ * ("2026-11-24T00:30:00Z") é convertido para o dia no horário do Piauí.
+ */
 export function data(iso: string | null | undefined): string {
   if (!iso) return "—";
+  if (iso.includes("T")) {
+    return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Fortaleza" });
+  }
   const [ano, mes, dia] = iso.slice(0, 10).split("-");
   return `${dia}/${mes}/${ano}`;
 }
@@ -101,11 +107,33 @@ export function cpfCnpj(valor: string | null): string {
   return valor.replace(/(.{2})(.{3})(.{3})(.{4})(.{2})/, "$1.$2.$3/$4-$5");
 }
 
-/** Texto digitado ("14.900,50" ou "14900.5") → "14900.50" para a API; null se vazio/inválido. */
+/**
+ * Dinheiro digitado → "14900.50" para a API; null se vazio ou se não der para entender.
+ *
+ * Lê do jeito brasileiro: vírgula é centavo e ponto é milhar. "14.900" são quatorze mil e
+ * novecentos, não quatorze e noventa. Aceita também "14900.5" e "1,500.00".
+ */
 export function valorParaApi(texto: string): string | null {
   const limpo = texto.replace(/[R$\s]/g, "");
-  if (!limpo) return null;
-  const normal = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
+  if (!/^\d[\d.,]*$/.test(limpo)) return null;
+
+  const virgulas = limpo.split(",").length - 1;
+  let normal: string;
+  if (virgulas === 1 && limpo.lastIndexOf(",") > limpo.lastIndexOf(".")) {
+    // 14.900,50 → a vírgula separa os centavos
+    normal = limpo.replace(/\./g, "").replace(",", ".");
+  } else if (virgulas >= 1 && /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(limpo)) {
+    // 1,500.00 → formato americano
+    normal = limpo.replace(/,/g, "");
+  } else if (virgulas === 0 && /^\d{1,3}(\.\d{3})+$/.test(limpo)) {
+    // 14.900 ou 1.500.000 → os pontos são de milhar
+    normal = limpo.replace(/\./g, "");
+  } else if (virgulas === 0 && /^\d+(\.\d+)?$/.test(limpo)) {
+    // 14900 ou 14900.5 → o ponto separa os centavos
+    normal = limpo;
+  } else {
+    return null;
+  }
   const n = Number(normal);
   return Number.isFinite(n) ? n.toFixed(2) : null;
 }

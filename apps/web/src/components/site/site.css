@@ -546,7 +546,10 @@
   padding: 1.6rem 0;
   border-top: 3px solid var(--tinta);
 }
-.anuncio:last-of-type {
+.anuncio[hidden] {
+  display: none;
+}
+.vitrine__lista {
   border-bottom: 3px solid var(--tinta);
 }
 .anuncio::before {

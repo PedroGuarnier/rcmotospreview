@@ -198,7 +198,9 @@ export function PlacaMercosul({
             onFocus={() => setFocada(true)}
             onBlur={() => setFocada(false)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && placaCompleta(valor)) aoConfirmar?.();
+              // sem repetição de tecla, sem consulta em andamento e sem placa protegida (•)
+              const pronta = placaCompleta(valor) && !valor.includes(OCULTO);
+              if (e.key === "Enter" && !e.repeat && editavel && pronta) aoConfirmar?.();
             }}
           />
         ) : (

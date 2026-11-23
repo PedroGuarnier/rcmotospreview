@@ -156,8 +156,12 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
 
   const deslogado = error instanceof ErroApi && error.status === 401;
   useEffect(() => {
-    if (deslogado) router.replace("/login");
-  }, [deslogado, router]);
+    if (!deslogado) return;
+    // A sessão caiu: apaga o que estava em memória, para o próximo a entrar neste
+    // computador não ver por um instante os dados de quem estava antes.
+    mutate(() => true, undefined, { revalidate: false });
+    router.replace("/login");
+  }, [deslogado, router, mutate]);
 
   if (error && !deslogado) {
     return (

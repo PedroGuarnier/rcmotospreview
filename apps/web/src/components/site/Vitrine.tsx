@@ -98,7 +98,8 @@ export function Vitrine({
   const [fotos, setFotos] = useState<VeiculoPublico | null>(null);
   const temMoto = veiculos.some((v) => v.tipo === "moto");
   const temCarro = veiculos.some((v) => v.tipo === "carro");
-  const lista = tipo ? veiculos.filter((v) => v.tipo === tipo) : veiculos;
+  const visivel = (v: VeiculoPublico) => !tipo || v.tipo === tipo;
+  const ordem = new Map(veiculos.filter(visivel).map((v, i) => [v.id, i + 1]));
 
   return (
     <section id="vitrine" className="claro vitrine" aria-labelledby="titulo-vitrine">
@@ -150,10 +151,11 @@ export function Vitrine({
         </div>
       ) : (
         <div>
-          {lista.map((v, i) => (
-            <article key={v.id} className="anuncio" data-revelar>
+          <div className="vitrine__lista">
+          {veiculos.map((v) => (
+            <article key={v.id} className="anuncio" data-revelar hidden={!visivel(v)}>
               <p className="dado anuncio__num" aria-hidden>
-                {String(i + 1).padStart(2, "0")}
+                {String(ordem.get(v.id) ?? 0).padStart(2, "0")}
               </p>
 
               {v.fotos.length > 0 ? (
@@ -164,7 +166,13 @@ export function Vitrine({
                   aria-label={`Ver ${v.fotos.length} ${v.fotos.length === 1 ? "foto" : "fotos"} de ${v.marca} ${v.modelo}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- miniatura já otimizada pela API */}
-                  <img src={v.fotos[0].url} alt="" loading="lazy" />
+                  <img
+                    src={v.fotos[0].miniatura_url}
+                    srcSet={`${v.fotos[0].miniatura_url} 480w, ${v.fotos[0].url} 1920w`}
+                    sizes="(min-width: 760px) 19rem, 100vw"
+                    alt=""
+                    loading="lazy"
+                  />
                   {v.fotos.length > 1 && <span className="dado anuncio__conta">{v.fotos.length} fotos</span>}
                 </button>
               ) : (
@@ -215,6 +223,7 @@ export function Vitrine({
               </div>
             </article>
           ))}
+          </div>
           {ilustrativo && (
             <p className="dado vitrine__nota">Ambiente de demonstração: veículos, preços e laudos ilustrativos.</p>
           )}

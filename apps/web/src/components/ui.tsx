@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { valorParaCampo } from "@/lib/formato";
+import { valorParaApi, valorParaCampo } from "@/lib/formato";
 
 type Tom = "primario" | "amarelo" | "neutro" | "perigo" | "fantasma";
 
@@ -249,8 +249,9 @@ export function CampoValor({
           placeholder="0,00"
           onChange={(e) => aoMudar(e.target.value.replace(/[^\d.,]/g, ""))}
           onBlur={() => {
-            const limpo = valor.includes(",") ? valor.replace(/\./g, "").replace(",", ".") : valor;
-            if (limpo && Number.isFinite(Number(limpo))) aoMudar(valorParaCampo(limpo));
+            // mesma leitura que vai para a API: o que aparece no campo é o que será gravado
+            const lido = valorParaApi(valor);
+            if (lido !== null) aoMudar(valorParaCampo(lido));
           }}
           className={`${CAMPO} num pl-10`}
         />

@@ -35,6 +35,7 @@ function Conteudo() {
   }
 
   async function consultar() {
+    if (consultando) return; // cada consulta é paga no provedor real: nunca em dobro
     setErro("");
     setLaudo(null);
     setConsultando(true);

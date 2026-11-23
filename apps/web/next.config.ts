@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Gera .next/standalone: imagem Docker pequena, sem node_modules inteiro.
   output: "standalone",
+  poweredByHeader: false,
   turbopack: {
     rules: {
       "*.css": {

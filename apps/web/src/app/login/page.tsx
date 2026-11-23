@@ -20,6 +20,7 @@ export default function Login() {
     e.preventDefault();
     executar(async () => {
       const eu = await api<Eu>("/auth/entrar", { corpo: { email, senha } });
+      await mutate(() => true, undefined, { revalidate: false }); // nada da sessão anterior
       await mutate("/auth/eu", eu, { revalidate: false });
       router.replace(paginaInicial(eu));
     });
