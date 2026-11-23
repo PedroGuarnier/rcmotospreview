@@ -209,24 +209,25 @@ quando o problema é resolvido.
 - Etapas do veículo já seguem a linha do contrato: compra → documentação → preparação → à venda →
   vendido → pós-venda → concluído.
 - Fotos são redimensionadas (1920 px + miniatura de 480 px) e têm os metadados removidos (GPS).
-- Cinco senhas erradas seguidas bloqueiam o login daquele e-mail por 15 minutos. Trocar a senha
-  ou desativar o usuário derruba as sessões abertas na hora.
+- Cinco senhas erradas seguidas, do mesmo endereço de rede, bloqueiam aquele endereço por 15
+  minutos para aquele e-mail (quem erra a senha de outra pessoa não tranca a conta dela). Trocar
+  a senha ou desativar o usuário derruba as sessões abertas na hora.
+- Dinheiro é lido do jeito brasileiro: "14.900" são quatorze mil e novecentos.
 
 ## Colocar em produção
 
 Pela cláusula 6 do contrato, domínio, hospedagem, banco e contas ficam **no nome da RC Motos**,
 com o desenvolvedor como administrador.
 
-1. Servidor (ou serviço de containers) com Docker, na conta da loja.
-2. `.env` com `AMBIENTE=producao`, senha forte do banco e `SEGREDO_JWT` gerado com
-   `openssl rand -hex 32`. A API se recusa a subir em produção sem esse segredo.
-3. **HTTPS obrigatório**: em produção o cookie de sessão só trafega por HTTPS. Coloque um proxy
-   com certificado (Caddy, Nginx ou o balanceador da nuvem) na frente da porta da web.
-4. `docker compose up --build -d` e `docker compose exec api python -m app.seed` para criar o dono.
-5. **Backups**: os dados vivem em dois volumes — `dados_banco` (PostgreSQL) e `fotos`. Agende
-   `pg_dump` diário e cópia do volume de fotos para fora do servidor.
+Use o [`docker-compose.producao.yml`](docker-compose.producao.yml), nunca o `docker-compose.yml`
+(que é para o computador de desenvolvimento). O de produção traz HTTPS automático, só as portas
+80 e 443 abertas, senhas obrigatórias e backup diário, e baixa as imagens já prontas do GitHub.
 
-Atualizar a versão: `git pull` seguido de `docker compose up --build -d` (as migrações rodam ao subir).
+O passo a passo completo — servidor, domínio, subir, backup, restauração, atualização e onde
+hospedar — está em [`deploy/producao/LEIA-ME.md`](deploy/producao/LEIA-ME.md).
+
+A cada envio para o `main`, o GitHub publica as imagens e sobe o conjunto de produção inteiro
+para conferir HTTPS, login e backup (`.github/workflows/imagens.yml`).
 
 ## Demonstração gratuita (Render)
 

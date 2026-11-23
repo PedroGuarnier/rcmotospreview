@@ -1,0 +1,22 @@
+# Porta de entrada: HTTPS automático e repasse para a web.
+# O certificado é pedido e renovado sozinho, desde que o domínio aponte para este servidor
+# e as portas 80 e 443 estejam abertas.
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy web:3000
+}
+
+# www → endereço principal
+www.{$DOMINIO} {
+	redir https://{$DOMINIO}{uri} permanent
+}

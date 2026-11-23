@@ -1,4 +1,7 @@
-# RC Motos Digital — sobe banco, API e web.
+# RC Motos Digital — sobe banco, API e web NO SEU COMPUTADOR (desenvolvimento e testes).
+#
+# NÃO use este arquivo em servidor: ele não tem HTTPS nem backup e aceita senhas padrão.
+# Para a loja usar de verdade: docker-compose.producao.yml (ver deploy/producao/LEIA-ME.md).
 #
 #   cp .env.example .env        # ajuste senhas
 #   docker compose up --build
@@ -63,7 +66,8 @@ services:
       LOJA_HORARIO: ${LOJA_HORARIO:-}
       LOJA_INSTAGRAM: ${LOJA_INSTAGRAM:-}
     ports:
-      - "${WEB_PORTA:-3000}:3000"
+      # Só a própria máquina alcança esta porta. Em servidor, use docker-compose.producao.yml.
+      - "127.0.0.1:${WEB_PORTA:-3000}:3000"
 
 volumes:
   dados_banco:

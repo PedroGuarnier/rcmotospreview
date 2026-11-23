@@ -20,3 +20,6 @@ apps/api/uploads/
 
 # Sistema / editor
 .DS_Store
+
+# Backups gerados no servidor (contêm dados da loja)
+backups/

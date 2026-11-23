@@ -1,0 +1,115 @@
+# RC Motos Digital — PRODUÇÃO (servidor da loja).
+#
+# Diferenças para o docker-compose.yml de desenvolvimento:
+#   - HTTPS automático (Caddy pede e renova o certificado sozinho);
+#   - só as portas 80 e 443 ficam abertas; banco, API e web ficam na rede interna;
+#   - senhas e segredo são obrigatórios: sem eles, nada sobe;
+#   - backup diário do banco e semanal das fotos em ./backups;
+#   - usa as imagens publicadas pelo GitHub (não precisa compilar no servidor).
+#
+# Passo a passo: deploy/producao/LEIA-ME.md
+#
+#   docker compose -f docker-compose.producao.yml --env-file .env up -d
+
+name: rcmotos
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rcmotos}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}"
+      POSTGRES_DB: ${POSTGRES_DB:-rcmotos}
+    volumes:
+      - dados_banco:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: ${IMAGEM_API:-ghcr.io/pedroguarnier/rcmotospreview-api:main}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      AMBIENTE: producao
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rcmotos}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rcmotos}
+      SEGREDO_JWT: "${SEGREDO_JWT:?Defina SEGREDO_JWT no .env com o resultado de openssl rand -hex 32}"
+      PROCEDENCIA_PROVEDOR: ${PROCEDENCIA_PROVEDOR:-}
+      UPLOADS_DIR: /dados/uploads
+      DONO_NOME: ${DONO_NOME:-}
+      DONO_EMAIL: ${DONO_EMAIL:-}
+      DONO_SENHA: ${DONO_SENHA:-}
+    volumes:
+      - fotos:/dados/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/saude')"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  web:
+    image: ${IMAGEM_WEB:-ghcr.io/pedroguarnier/rcmotospreview-web:main}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_URL: http://api:8000
+      SITE_URL: "https://${DOMINIO:?Defina DOMINIO no .env, por exemplo rcmotos.com.br}"
+      LOJA_WHATSAPP: ${LOJA_WHATSAPP:-}
+      LOJA_CIDADE: ${LOJA_CIDADE:-}
+      LOJA_ENDERECO: ${LOJA_ENDERECO:-}
+      LOJA_HORARIO: ${LOJA_HORARIO:-}
+      LOJA_INSTAGRAM: ${LOJA_INSTAGRAM:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      DOMINIO: ${DOMINIO}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/producao/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dados:/data
+      - caddy_config:/config
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      # espera a API (que aplica as migrações), para o primeiro backup já ter as tabelas
+      api:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-rcmotos}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-rcmotos}
+      TZ: America/Fortaleza
+    volumes:
+      - ./deploy/producao/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+      - fotos:/fotos:ro
+    entrypoint: ["sh", "/backup.sh"]
+
+volumes:
+  dados_banco:
+  fotos:
+  caddy_dados:
+  caddy_config:

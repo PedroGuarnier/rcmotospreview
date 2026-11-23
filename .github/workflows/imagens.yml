@@ -1,0 +1,100 @@
+name: Publicar imagens
+
+# Constrói as imagens da API e da web e publica no registro do GitHub (ghcr.io).
+# O servidor de produção só baixa essas imagens: não precisa compilar nada lá.
+# Depois de publicar, sobe o conjunto de produção inteiro e confere que ele funciona.
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "apps/**"
+      - "docker-compose.producao.yml"
+      - "deploy/producao/**"
+      - ".github/workflows/imagens.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publicar:
+    name: Publicar ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nome e etiqueta da imagem
+        id: img
+        run: |
+          dono=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          ramo=$(echo "${{ github.ref_name }}" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          echo "nome=ghcr.io/$dono/rcmotospreview-${{ matrix.app }}" >> "$GITHUB_OUTPUT"
+          echo "ramo=$ramo" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ matrix.app }}
+          push: true
+          tags: |
+            ${{ steps.img.outputs.nome }}:${{ steps.img.outputs.ramo }}
+            ${{ steps.img.outputs.nome }}:${{ github.sha }}
+
+  producao:
+    name: Testar o conjunto de produção
+    needs: publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configuração de teste (domínio "localhost", senhas sorteadas)
+        run: |
+          dono=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          {
+            echo "DOMINIO=localhost"
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "SEGREDO_JWT=$(openssl rand -hex 32)"
+            echo "DONO_NOME=Dono de teste"
+            echo "DONO_EMAIL=dono@teste.local"
+            echo "DONO_SENHA=$(openssl rand -hex 12)"
+            echo "IMAGEM_API=ghcr.io/$dono/rcmotospreview-api:${{ github.sha }}"
+            echo "IMAGEM_WEB=ghcr.io/$dono/rcmotospreview-web:${{ github.sha }}"
+          } > .env
+      - name: Subir banco, API, web, HTTPS e backup
+        run: docker compose -f docker-compose.producao.yml --env-file .env up -d --wait --wait-timeout 180
+      - name: Criar o dono
+        run: docker compose -f docker-compose.producao.yml --env-file .env exec -T api python -m app.seed
+      - name: HTTP redireciona para HTTPS e o site responde
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/)" = "308"
+          curl -sk --fail --retry 10 --retry-delay 2 --retry-all-errors https://localhost/ -o /dev/null
+          curl -sk --fail https://localhost/api/publico/veiculos | jq -e '.veiculos == [] and .ilustrativo == false'
+      - name: Login com cookie seguro e documentação da API fechada
+        run: |
+          senha=$(grep '^DONO_SENHA=' .env | cut -d= -f2)
+          curl -sk --fail -D cabecalhos.txt -o /dev/null -X POST https://localhost/api/auth/entrar \
+            -H 'content-type: application/json' \
+            -d "{\"email\":\"dono@teste.local\",\"senha\":\"$senha\"}"
+          grep -i '^set-cookie:.*Secure' cabecalhos.txt
+          grep -i '^set-cookie:.*HttpOnly' cabecalhos.txt
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/api/docs)" = "404"
+      - name: O backup foi gerado e contém as tabelas
+        run: |
+          ls -la backups/
+          test "$(gunzip -c backups/banco-*.sql.gz | grep -c 'CREATE TABLE')" -ge 11
+      - name: Exibir logs em caso de falha
+        if: failure()
+        run: docker compose -f docker-compose.producao.yml --env-file .env logs --no-color
