@@ -163,6 +163,7 @@ function Conteudo() {
                       : null,
                     laudo.dados_veiculo.cor,
                     laudo.dados_veiculo.municipio && `${laudo.dados_veiculo.municipio}/${laudo.dados_veiculo.uf}`,
+                    laudo.dados_veiculo.chassi && `Chassi ${laudo.dados_veiculo.chassi}`,
                   ]
                     .filter(Boolean)
                     .join(" · ")}

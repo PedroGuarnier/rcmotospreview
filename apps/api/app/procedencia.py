@@ -1,12 +1,13 @@
 """Consulta de procedência pela placa (roubo/furto, leilão, Renajud, dados cadastrais).
 
-O provedor é trocável. Hoje existe só o de demonstração, que devolve dados ILUSTRATIVOS e
-determinísticos para a interface poder ser mostrada e testada. O provedor nacional (ex.:
-Infosimples) entra como mais uma função em `_PROVEDORES` quando a conta da loja existir —
-ele precisa devolver o mesmo formato de `dados`.
+O provedor é trocável (`PROCEDENCIA_PROVEDOR`):
+- `demonstracao`: dados ILUSTRATIVOS e determinísticos, para mostrar e testar a interface;
+- `consultarplaca`: API da Consultar Placa (`app/consultarplaca.py`), paga por consulta.
+Outro provedor entra como mais uma função em `_PROVEDORES`, devolvendo o mesmo formato de
+`dados` (`veiculo` + `itens` com `situacao` ok/atencao/alerta).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,6 +28,15 @@ class ProcedenciaIndisponivel(Exception):
     """Não há provedor configurado (ou ele não pode ser usado neste ambiente)."""
 
 
+class ProcedenciaFalhou(Exception):
+    """O provedor não entregou o laudo. `mensagem` vai para a tela; nada é guardado."""
+
+    def __init__(self, mensagem: str, status: int = 502):
+        super().__init__(mensagem)
+        self.mensagem = mensagem
+        self.status = status
+
+
 def provedor_ativo() -> str | None:
     cfg = obter_config()
     nome = cfg.procedencia_provedor.strip().lower()
@@ -34,6 +44,10 @@ def provedor_ativo() -> str | None:
         nome = "demonstracao"
     if nome == "demonstracao" and cfg.producao:
         return None  # laudo ilustrativo nunca entra em produção
+    if nome == "consultarplaca":
+        from app import consultarplaca
+
+        return nome if consultarplaca.configurado() else None
     return nome if nome in _PROVEDORES else None
 
 
@@ -89,22 +103,56 @@ def _demonstracao(placa: str, veiculo: Veiculo | None) -> dict:
     }
 
 
-_PROVEDORES = {"demonstracao": _demonstracao}
+def _consultarplaca(placa: str, veiculo: Veiculo | None) -> dict:
+    from app import consultarplaca  # importa daqui ITENS e ProcedenciaFalhou
+
+    return consultarplaca.consultar(placa, veiculo)
+
+
+_PROVEDORES = {"demonstracao": _demonstracao, "consultarplaca": _consultarplaca}
+
+
+def _laudo_recente(db: Session, placa: str, nome: str) -> LaudoProcedencia | None:
+    """Laudo completo da mesma placa feito há pouco: evita pagar duas vezes pela mesma consulta."""
+    horas = obter_config().procedencia_reuso_horas
+    if nome == "demonstracao" or horas <= 0:
+        return None
+    laudo = db.scalar(
+        select(LaudoProcedencia)
+        .where(
+            LaudoProcedencia.placa == placa,
+            LaudoProcedencia.provedor == nome,
+            LaudoProcedencia.criado_em >= datetime.now(UTC) - timedelta(hours=horas),
+        )
+        .order_by(LaudoProcedencia.id.desc())
+        .limit(1)
+    )
+    if laudo is None or any(item.get("pendente") for item in laudo.dados.get("itens", [])):
+        return None
+    return laudo
 
 
 def consultar(db: Session, placa: str, usuario: Usuario) -> LaudoProcedencia:
-    """Consulta o provedor e guarda o laudo (ligado ao veículo, se a placa já está no estoque)."""
+    """Consulta o provedor e guarda o laudo (ligado ao veículo, se a placa já está no estoque).
+
+    Em provedor pago, um laudo completo da mesma placa feito nas últimas
+    `PROCEDENCIA_REUSO_HORAS` horas é devolvido no lugar de uma consulta nova.
+    """
     nome = provedor_ativo()
     if nome is None:
         raise ProcedenciaIndisponivel
+    recente = _laudo_recente(db, placa, nome)
+    if recente is not None:
+        return recente
     veiculo = db.scalar(select(Veiculo).where(Veiculo.placa == placa))
     dados = _PROVEDORES[nome](placa, veiculo)
+    ilustrativo = dados.pop("ilustrativo", nome == "demonstracao")
     dados["consultado_em"] = datetime.now(UTC).isoformat()
     laudo = LaudoProcedencia(
         veiculo=veiculo,
         placa=placa,
         provedor=nome,
-        ilustrativo=nome == "demonstracao",
+        ilustrativo=ilustrativo,
         semaforo=classificar(dados["itens"]),
         dados=dados,
         consultado_por_id=usuario.id,

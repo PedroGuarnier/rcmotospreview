@@ -106,6 +106,8 @@ def consultar(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "A consulta de procedência ainda não está conectada a um provedor.",
         ) from exc
+    except procedencia.ProcedenciaFalhou as exc:
+        raise HTTPException(exc.status, exc.mensagem) from exc
     db.commit()
     return serializar(_carregar(db, laudo.id))
 

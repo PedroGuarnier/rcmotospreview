@@ -46,15 +46,31 @@ A página inicial (`/`) é o site da loja; o sistema da equipe fica em `/login`.
 - Na área da equipe (**Procedência**), dono e gerente consultam qualquer placa. O laudo fica no
   histórico; se a placa é de um veículo do estoque, aparece na página dele. Placa consultada
   antes da compra é ligada ao veículo quando ele for cadastrado.
-- **Ainda não há provedor real conectado.** Sem `PROCEDENCIA_PROVEDOR`, a tela avisa que a
-  consulta está desligada. Com `demonstracao` (ou `DADOS_DEMO=true`) os resultados são
-  **ilustrativos** e marcados como tal — placas terminadas em 3 dão "atenção" e em 7, "alerta".
-  O modo demonstração é recusado com `AMBIENTE=producao`, e laudo ilustrativo nunca aparece no
-  site fora da demonstração.
-- Para ligar o provedor nacional (ex.: Infosimples, na conta da loja): escrever em
-  `apps/api/app/procedencia.py` uma função que chama a API dele e devolve o mesmo formato de
-  `dados` (`veiculo` + `itens` com `situacao` ok/atencao/alerta), registrá-la em `_PROVEDORES`
-  e apontar `PROCEDENCIA_PROVEDOR` para ela. Telas, semáforo e histórico já funcionam em cima disso.
+- Sem `PROCEDENCIA_PROVEDOR`, a tela avisa que a consulta está desligada. Com `demonstracao`
+  (ou `DADOS_DEMO=true`) os resultados são **ilustrativos** e marcados como tal — placas
+  terminadas em 3 dão "atenção" e em 7, "alerta". O modo demonstração é recusado com
+  `AMBIENTE=producao`, e laudo ilustrativo nunca aparece no site fora da demonstração.
+- **Provedor real: Consultar Placa** (`PROCEDENCIA_PROVEDOR=consultarplaca`, código em
+  `apps/api/app/consultarplaca.py`, documentação em <https://docs.consultarplaca.com.br>).
+  - Criar a conta **no nome da loja** em consultarplaca.com.br, gerar a chave em Minha Conta →
+    API e preencher `CONSULTARPLACA_EMAIL` e `CONSULTARPLACA_API_KEY`. Sem os dois, a consulta
+    fica desligada.
+  - É pré-pago: comprar créditos no site deles. Cada placa faz quatro consultas avulsas
+    (básica, roubo e furto, leilão, Renajud), cerca de R$ 30 no preço de tabela de 11/2026.
+    A básica vai primeiro; se a placa não existe, as outras três não são feitas.
+  - A placa `AAA0000` devolve dados fictícios sem gastar crédito; o laudo dela sai marcado
+    como ilustrativo. Serve para conferir a chave depois de configurar.
+  - Laudo completo da mesma placa feito nas últimas `PROCEDENCIA_REUSO_HORAS` horas (24) é
+    reaberto em vez de pagar outra consulta. Item que o provedor não conseguiu verificar
+    fica em "atenção" (o laudo não dá verde) e a próxima consulta refaz tudo.
+  - A consulta de leilão pode levar alguns minutos quando há oferta registrada (o provedor
+    pede espera de até 300 s); o proxy na frente do sistema precisa tolerar esse tempo.
+  - Regras do semáforo: Renajud ativo, roubo ou furto sem devolução e leilão classe C ou D
+    dão "alerta"; roubo ou furto já devolvido, leilão classe A ou B, sinistro, remarketing e
+    divergência de chassi ou ano com o cadastro da loja dão "atenção".
+- Para trocar de provedor: escrever uma função que devolve o mesmo formato de `dados`
+  (`veiculo` + `itens` com `situacao` ok/atencao/alerta) e registrá-la em `_PROVEDORES`
+  (`apps/api/app/procedencia.py`). Telas, semáforo e histórico funcionam em cima disso.
 
 ## Estrutura
 
@@ -212,7 +228,9 @@ Docker (`.env` na raiz): veja [`.env.example`](.env.example).
 | `SESSAO_HORAS` | duração do login | 168 (7 dias) |
 | `UPLOADS_DIR` | pasta das fotos | `uploads` |
 | `DADOS_DEMO` | mostra o aviso "números ilustrativos" | `false` |
-| `PROCEDENCIA_PROVEDOR` | provedor da consulta de placa (vazio = desligada) | vazio |
+| `PROCEDENCIA_PROVEDOR` | provedor da consulta de placa: vazio (desligada), `demonstracao` ou `consultarplaca` | vazio |
+| `CONSULTARPLACA_EMAIL` / `CONSULTARPLACA_API_KEY` | conta da loja na Consultar Placa | vazio |
+| `PROCEDENCIA_REUSO_HORAS` | horas em que um laudo pago da mesma placa é reaproveitado (0 = nunca) | 24 |
 | `DIAS_PARADO_ALERTA` | dias na mesma etapa para aparecer em "parados" | 45 |
 | `FUSO_HORARIO` | fuso da loja | `America/Fortaleza` |
 

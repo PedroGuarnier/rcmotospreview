@@ -30,9 +30,14 @@ class Config(BaseSettings):
     fuso_horario: str = "America/Fortaleza"
     dias_parado_alerta: int = 45
 
-    # Consulta de procedência pela placa: "" (desligada) | "demonstracao".
-    # O provedor real (ex.: Infosimples) entra aqui quando a conta da loja existir.
+    # Consulta de procedência pela placa: "" (desligada) | "demonstracao" | "consultarplaca".
     procedencia_provedor: str = ""
+    # Conta na Consultar Placa (e-mail da conta + chave gerada em Minha Conta > API).
+    consultarplaca_email: str = ""
+    consultarplaca_api_key: str = ""
+    # Provedor pago: laudo completo da mesma placa feito há menos de N horas é reaproveitado
+    # em vez de pagar outra consulta (0 = sempre consulta de novo).
+    procedencia_reuso_horas: int = 24
 
     # Quando true, a interface avisa que os números são ilustrativos (dados do seed --demo).
     dados_demo: bool = False

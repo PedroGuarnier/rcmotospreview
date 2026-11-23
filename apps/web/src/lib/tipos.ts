@@ -254,6 +254,8 @@ export interface Laudo {
     tipo?: TipoVeiculo;
     municipio?: string;
     uf?: string;
+    /** chassi no cadastro nacional (só provedor real) */
+    chassi?: string;
   };
   itens: ItemLaudo[];
   historico: MarcoHistorico[];
