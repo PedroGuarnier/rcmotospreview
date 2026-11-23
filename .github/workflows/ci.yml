@@ -53,3 +53,20 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit
       - run: npm run build
+
+  docker:
+    name: Integração com Docker Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imagens e iniciar os serviços
+        run: docker compose --env-file .env.example up --build --wait --wait-timeout 120
+      - name: Consultar o catálogo pela porta pública
+        run: |
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 \
+            http://localhost:3000/api/publico/veiculos -o catalogo.json
+          jq -e '.veiculos == [] and .ilustrativo == false' catalogo.json
+      - name: Exibir logs em caso de falha
+        if: failure()
+        run: docker compose --env-file .env.example logs --no-color
