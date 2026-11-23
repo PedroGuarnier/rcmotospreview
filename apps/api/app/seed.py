@@ -46,7 +46,7 @@ def criar_dono(db) -> Usuario:
         return dono
     email = os.environ.get("DONO_EMAIL", "").strip().lower()
     senha = os.environ.get("DONO_SENHA", "")
-    nome = os.environ.get("DONO_NOME", "Dono")
+    nome = os.environ.get("DONO_NOME") or "Dono"
     if not email or len(senha) < 8:
         sys.exit("Defina DONO_EMAIL e DONO_SENHA (mín. 8 caracteres) para criar o dono.")
     dono = Usuario(

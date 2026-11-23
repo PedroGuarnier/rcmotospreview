@@ -21,6 +21,7 @@ from sqlalchemy import text  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Perfil, RegraComissao, Usuario  # noqa: E402
+from app.rotas import auth, publico  # noqa: E402
 from app.security import gerar_hash  # noqa: E402
 
 SENHA = "senha-de-teste"
@@ -40,6 +41,8 @@ def _limpar():
     tabelas = ", ".join(t.name for t in Base.metadata.sorted_tables)
     with engine.begin() as con:
         con.execute(text(f"TRUNCATE {tabelas} RESTART IDENTITY CASCADE"))
+    for janela in (auth.ERROS_POR_IP, auth.ERROS_POR_CONTA, publico.POR_MINUTO, publico.POR_HORA):
+        janela.zerar()
     yield
 
 

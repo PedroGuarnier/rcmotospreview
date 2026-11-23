@@ -108,6 +108,12 @@ def registrar_venda(db: Session, dados: schemas.VendaCriar, usuario: Usuario) ->
             else "Este veículo já foi vendido.",
         )
 
+    if veiculo.debitos_abertos:
+        raise erro(
+            status.HTTP_409_CONFLICT,
+            "Este veículo tem débito em aberto. Quite o débito antes de dar baixa na venda.",
+        )
+
     vendedor_id = dados.vendedor_id or usuario.id
     if not pode(usuario, P.vendas_ver_todas) and vendedor_id != usuario.id:
         raise erro(status.HTTP_403_FORBIDDEN, "Você só pode registrar vendas em seu nome.")
@@ -170,7 +176,9 @@ def cancelar_venda(db: Session, venda: Venda, motivo: str, usuario: Usuario) -> 
     venda.motivo_cancelamento = motivo
     if venda.comissao is not None:
         venda.comissao.status = StatusComissao.cancelada
-    mudar_situacao(venda.veiculo, Situacao.a_venda)
+    # Volta ao estoque. Com débito em aberto não pode ficar "à venda" (nem aparecer no site).
+    destino = Situacao.documentacao if venda.veiculo.debitos_abertos else Situacao.a_venda
+    mudar_situacao(venda.veiculo, destino)
 
 
 def recalcular_venda_do_veiculo(veiculo: Veiculo) -> None:

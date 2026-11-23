@@ -10,6 +10,7 @@ from app.db import obter_db
 from app.models import Comissao, StatusComissao, Usuario, Venda
 from app.permissoes import P, exigir, pode, usuario_atual
 from app.rotas.vendas import intervalo_do_mes
+from app.servicos import recalcular_venda_do_veiculo
 from app.tempo import hoje
 
 router = APIRouter(prefix="/comissoes", tags=["comissões"])
@@ -134,5 +135,7 @@ def desfazer_pagamento(
         raise HTTPException(status.HTTP_409_CONFLICT, "Esta comissão não está paga.")
     comissao.status = StatusComissao.pendente
     comissao.paga_em = None
+    # Enquanto estava paga o valor ficou congelado: refaz com o lucro de agora.
+    recalcular_venda_do_veiculo(comissao.venda.veiculo)
     db.commit()
     return _serializar(comissao)

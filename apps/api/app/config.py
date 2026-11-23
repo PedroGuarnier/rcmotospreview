@@ -1,10 +1,13 @@
+import secrets
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-SEGREDO_PADRAO_DEV = "troque-este-segredo-antes-de-ir-para-producao"
+# Sem SEGREDO_JWT, cada processo sorteia o seu: nunca existe um segredo conhecido (o código é
+# público). O efeito colateral, só em desenvolvimento, é que reiniciar a API desloga todo mundo.
+SEGREDO_SORTEADO = secrets.token_hex(32)
 
 
 class Config(BaseSettings):
@@ -14,7 +17,7 @@ class Config(BaseSettings):
     database_url: str = "postgresql+psycopg://rcmotos:rcmotos@localhost:5432/rcmotos"
 
     # Sessão
-    segredo_jwt: str = SEGREDO_PADRAO_DEV
+    segredo_jwt: str = SEGREDO_SORTEADO
     sessao_horas: int = 24 * 7
     cookie_sessao: str = "rc_sessao"
 
@@ -50,9 +53,9 @@ class Config(BaseSettings):
 
     @field_validator("segredo_jwt", mode="before")
     @classmethod
-    def _segredo_vazio_usa_padrao(cls, valor: str | None) -> str:
+    def _segredo_vazio_usa_sorteado(cls, valor: str | None) -> str:
         # SEGREDO_JWT= (vazio) no .env equivale a não definir.
-        return valor or SEGREDO_PADRAO_DEV
+        return valor or SEGREDO_SORTEADO
 
     @property
     def producao(self) -> bool:
@@ -60,7 +63,7 @@ class Config(BaseSettings):
 
     @model_validator(mode="after")
     def _exigir_segredo_em_producao(self) -> "Config":
-        if self.producao and (self.segredo_jwt == SEGREDO_PADRAO_DEV or len(self.segredo_jwt) < 32):
+        if self.producao and (self.segredo_jwt == SEGREDO_SORTEADO or len(self.segredo_jwt) < 32):
             raise ValueError(
                 "Defina SEGREDO_JWT com pelo menos 32 caracteres aleatórios em produção "
                 "(ex.: openssl rand -hex 32)."

@@ -166,9 +166,16 @@ def test_laudo_ilustrativo_nao_aparece_fora_da_demonstracao(
 
 
 def test_limite_de_consultas_publicas(anonimo):
-    from app.rotas import publico
+    codigos = [anonimo.get("/publico/procedencia/ZZZ9Z99").status_code for _ in range(12)]
+    assert codigos[:10] == [404] * 10 and codigos[10:] == [429, 429]
 
-    publico._acessos.clear()
-    codigos = [anonimo.get("/publico/procedencia/ZZZ9Z99").status_code for _ in range(32)]
-    assert codigos[:30] == [404] * 30 and codigos[30:] == [429, 429]
-    publico._acessos.clear()
+
+def test_limite_nao_e_burlado_trocando_o_cabecalho_de_ip(anonimo):
+    # O primeiro valor do X-Forwarded-For é o que o cliente inventa; vale o último salto.
+    codigos = [
+        anonimo.get(
+            "/publico/procedencia/ZZZ9Z99", headers={"x-forwarded-for": f"10.0.0.{i}, 203.0.113.9"}
+        ).status_code
+        for i in range(12)
+    ]
+    assert codigos[10:] == [429, 429]

@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app import schemas
 from app.db import obter_db
-from app.models import Perfil, Usuario
+from app.models import Perfil, RegraComissao, Usuario
 from app.permissoes import P, exigir, usuario_atual
+from app.rotas.auth import ERROS_POR_CONTA
 from app.security import gerar_hash
 
 router = APIRouter(prefix="/usuarios", tags=["usuários"])
@@ -96,6 +97,15 @@ def atualizar(
         setattr(usuario, campo, valor)
     if usuario.perfil == Perfil.dono:
         usuario.acesso_aportes = True
+    elif perfil_antes == Perfil.dono:
+        # Deixou de ser dono: o acesso aos aportes não vai junto, salvo se pedido de propósito.
+        usuario.acesso_aportes = bool(campos.get("acesso_aportes", False))
+    # A regra de comissão é conferida com o que ficou gravado, não só com o que veio no pedido.
+    if usuario.comissao_regra is not None:
+        if usuario.comissao_valor is None:
+            raise HTTPException(422, "Informe o valor da regra de comissão.")
+        if usuario.comissao_regra != RegraComissao.valor_fixo and usuario.comissao_valor > 100:
+            raise HTTPException(422, "O percentual de comissão não pode passar de 100%.")
     if campos.get("ativo") is False or usuario.perfil != perfil_antes:
         usuario.versao_sessao += 1  # perde o acesso antigo na hora
     db.commit()
@@ -112,6 +122,5 @@ def redefinir_senha(
     usuario = _obter(db, usuario_id)
     usuario.senha_hash = gerar_hash(dados.nova_senha)
     usuario.versao_sessao += 1
-    usuario.tentativas_login = 0
-    usuario.bloqueado_ate = None
+    ERROS_POR_CONTA.limpar(usuario.email)  # libera o login, se estava bloqueado
     db.commit()

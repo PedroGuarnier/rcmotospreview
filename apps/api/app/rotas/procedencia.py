@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import procedencia, schemas
 from app.db import obter_db
 from app.models import LaudoProcedencia, TipoCusto, Usuario, Veiculo
-from app.permissoes import P, exigir
+from app.permissoes import P, exigir, pode
 
 router = APIRouter(tags=["procedência"])
 
@@ -60,7 +60,20 @@ def historico_do_veiculo(veiculo: Veiculo | None, laudo: LaudoProcedencia | None
     return [m for _, m in sorted(marcos, key=lambda par: par[0])]
 
 
-def serializar(laudo: LaudoProcedencia) -> schemas.LaudoOut:
+# Frase por situação, para quem não deve ler o texto do provedor (pode citar terceiros).
+FRASE_PUBLICA = {
+    "ok": "Nada consta.",
+    "atencao": "Ponto de atenção — a loja explica o que é.",
+    "alerta": "Restrição encontrada — fale com a loja.",
+}
+
+
+def serializar(laudo: LaudoProcedencia, *, completo: bool = True) -> schemas.LaudoOut:
+    """`completo=False` tira o texto do provedor e as descrições de custos (sem custos.ver)."""
+    itens = [schemas.ItemLaudo(**item) for item in laudo.dados.get("itens", [])]
+    if not completo:
+        for item in itens:
+            item.detalhe = FRASE_PUBLICA.get(item.situacao, "")
     return schemas.LaudoOut(
         id=laudo.id,
         placa=laudo.placa,
@@ -72,8 +85,8 @@ def serializar(laudo: LaudoProcedencia) -> schemas.LaudoOut:
         veiculo_id=laudo.veiculo_id,
         veiculo_descricao=laudo.veiculo.descricao if laudo.veiculo else None,
         dados_veiculo=laudo.dados.get("veiculo") or {},
-        itens=[schemas.ItemLaudo(**item) for item in laudo.dados.get("itens", [])],
-        historico=historico_do_veiculo(laudo.veiculo, laudo, publico=False),
+        itens=itens,
+        historico=historico_do_veiculo(laudo.veiculo, laudo, publico=not completo),
     )
 
 
@@ -126,7 +139,7 @@ def listar(
 @router.get("/veiculos/{veiculo_id}/laudos", response_model=list[schemas.LaudoOut])
 def laudos_do_veiculo(
     veiculo_id: int,
-    _: Usuario = Depends(exigir(P.estoque_ver)),
+    usuario: Usuario = Depends(exigir(P.estoque_ver)),
     db: Session = Depends(obter_db),
 ):
     laudos = db.scalars(
@@ -135,4 +148,10 @@ def laudos_do_veiculo(
         .options(*_CARGA)
         .order_by(LaudoProcedencia.id.desc())
     )
-    return [serializar(laudo) for laudo in laudos]
+    completo = pode(usuario, P.custos_ver)
+    # Laudo de uma placa antiga (corrigida depois) não vale para o veículo.
+    return [
+        serializar(laudo, completo=completo)
+        for laudo in laudos
+        if laudo.veiculo is None or laudo.placa == laudo.veiculo.placa
+    ]

@@ -114,7 +114,13 @@ def consultar(db: Session, placa: str, usuario: Usuario) -> LaudoProcedencia:
 
 
 def ligar_laudos_ao_veiculo(db: Session, veiculo: Veiculo) -> None:
-    """Placa consultada antes da compra: ao cadastrar o veículo, os laudos passam a ser dele."""
+    """Placa consultada antes da compra: ao cadastrar o veículo, os laudos passam a ser dele.
+
+    Se a placa do veículo foi corrigida, os laudos da placa antiga deixam de ser dele.
+    """
+    for laudo in list(veiculo.laudos):
+        if laudo.placa != veiculo.placa:
+            laudo.veiculo = None
     if not veiculo.placa:
         return
     soltos = db.scalars(

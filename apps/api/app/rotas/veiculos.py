@@ -252,7 +252,7 @@ def atualizar(
     if veiculo.situacao == Situacao.a_venda and veiculo.preco_venda is None:
         raise HTTPException(422, "Veículo à venda precisa ter preço de venda.")
     if nova_situacao is not None and nova_situacao != veiculo.situacao:
-        if nova_situacao == Situacao.vendido:
+        if nova_situacao == Situacao.vendido and veiculo.venda_ativa is None:
             raise HTTPException(
                 status.HTTP_409_CONFLICT, "Para marcar como vendido, registre a venda."
             )
@@ -327,6 +327,11 @@ def remover_custo(
     custo = next((c for c in veiculo.custos if c.id == custo_id), None)
     if custo is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Custo não encontrado.")
+    if any(d.custo_id == custo.id for d in veiculo.debitos):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Este custo veio de um débito pago. Para tirá-lo, desfaça o pagamento do débito.",
+        )
     veiculo.custos.remove(custo)
     recalcular_venda_do_veiculo(veiculo)
     db.commit()

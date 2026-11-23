@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app import audit
 from app.config import obter_config
@@ -58,6 +58,15 @@ def _conflito(_: Request, __: IntegrityError) -> JSONResponse:
     return JSONResponse(
         {"detail": "Registro duplicado ou em uso por outro cadastro."},
         status_code=status.HTTP_409_CONFLICT,
+    )
+
+
+@app.exception_handler(DataError)
+def _dado_invalido(_: Request, __: DataError) -> JSONResponse:
+    """Texto maior que o campo, número fora do limite ou caractere inválido: 422, não erro 500."""
+    return JSONResponse(
+        {"detail": "Algum campo tem texto longo demais ou um valor fora do limite."},
+        status_code=422,
     )
 
 

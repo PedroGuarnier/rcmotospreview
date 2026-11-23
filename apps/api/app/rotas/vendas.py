@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import schemas, servicos
 from app.config import obter_config
 from app.db import obter_db
-from app.models import StatusVenda, Usuario, Venda
+from app.models import Comissao, StatusVenda, Usuario, Venda
 from app.permissoes import P, exigir, pode, usuario_atual
 from app.tempo import hoje
 
@@ -26,6 +26,8 @@ def intervalo_do_mes(mes: str) -> tuple[date, date]:
     """'AAAA-MM' → (primeiro dia, primeiro dia do mês seguinte)."""
     try:
         ano, numero = (int(p) for p in mes.split("-"))
+        if not 2000 <= ano <= 2100:
+            raise ValueError
         inicio = date(ano, numero, 1)
     except ValueError as exc:
         raise HTTPException(422, "Mês inválido. Use AAAA-MM.") from exc
@@ -154,6 +156,12 @@ def cancelar(
     db: Session = Depends(obter_db),
 ):
     venda = _obter(db, venda_id, usuario)
+    # Trava a venda e a comissão: cancelar e "marcar comissão paga" não se atropelam.
+    db.execute(select(Venda.id).where(Venda.id == venda.id).with_for_update())
+    db.execute(select(Comissao.id).where(Comissao.venda_id == venda.id).with_for_update())
+    db.refresh(venda)
+    if venda.comissao is not None:
+        db.refresh(venda.comissao)
     servicos.cancelar_venda(db, venda, dados.motivo, usuario)
     db.commit()
     return serializar(_obter(db, venda.id, usuario), usuario)

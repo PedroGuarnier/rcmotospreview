@@ -1,6 +1,4 @@
-from datetime import UTC, datetime, timedelta
-
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -8,6 +6,7 @@ from app import schemas
 from app.audit import registrar_evento
 from app.config import obter_config
 from app.db import obter_db
+from app.limites import Janela, ip_do_cliente
 from app.models import Usuario
 from app.permissoes import permissoes_de, usuario_atual
 from app.security import conferir_senha, criar_token, gerar_hash
@@ -36,39 +35,52 @@ def _gravar_cookie(resposta: Response, usuario: Usuario) -> None:
     )
 
 
-@router.post("/entrar", response_model=schemas.EuOut)
-def entrar(dados: schemas.Credenciais, resposta: Response, db: Session = Depends(obter_db)):
+# Tentativas erradas de login, por janela de 15 minutos:
+#   - mesmo e-mail + mesmo IP: bloqueia só aquele IP (quem erra a senha de outra pessoa
+#     não tranca a conta dela para ela mesma);
+#   - mesmo e-mail somando todos os IPs: teto mais alto, contra ataque espalhado.
+# Vale igual para e-mail que não existe, então a resposta não revela quem é cadastrado.
+def _janelas() -> tuple[Janela, Janela]:
     cfg = obter_config()
-    email = dados.email.strip().lower()
-    usuario = db.scalar(select(Usuario).where(Usuario.email == email).with_for_update())
-    agora = datetime.now(UTC)
+    segundos = cfg.bloqueio_login_minutos * 60
+    return Janela(cfg.max_tentativas_login, segundos), Janela(
+        cfg.max_tentativas_login * 6, segundos
+    )
 
-    if usuario is not None and usuario.bloqueado_ate and usuario.bloqueado_ate > agora:
-        minutos = max(1, int((usuario.bloqueado_ate - agora).total_seconds() // 60) + 1)
+
+ERROS_POR_IP, ERROS_POR_CONTA = _janelas()
+
+
+@router.post("/entrar", response_model=schemas.EuOut)
+def entrar(
+    dados: schemas.Credenciais,
+    request: Request,
+    resposta: Response,
+    db: Session = Depends(obter_db),
+):
+    email = dados.email.strip().lower()
+    par = (email, ip_do_cliente(request))
+
+    espera = max(ERROS_POR_IP.espera(par), ERROS_POR_CONTA.espera(email))
+    if espera > 0:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            f"Muitas tentativas. Tente de novo em {minutos} min.",
+            f"Muitas tentativas. Tente de novo em {int(espera // 60) + 1} min.",
         )
 
+    usuario = db.scalar(select(Usuario).where(Usuario.email == email))
     senha_ok = conferir_senha(dados.senha, usuario.senha_hash if usuario else None)
     if usuario is None or not senha_ok or not usuario.ativo:
-        if usuario is not None and not senha_ok:
-            usuario.tentativas_login += 1
-            if usuario.tentativas_login >= cfg.max_tentativas_login:
-                usuario.bloqueado_ate = agora + timedelta(minutes=cfg.bloqueio_login_minutos)
-                usuario.tentativas_login = 0
-                registrar_evento(
-                    db,
-                    "bloqueou",
-                    "sessao",
-                    usuario=usuario,
-                    resumo="Login bloqueado por tentativas",
-                )
+        ERROS_POR_IP.registrar(par)
+        ERROS_POR_CONTA.registrar(email)
+        if usuario is not None and ERROS_POR_IP.estourou(par):
+            registrar_evento(
+                db, "bloqueou", "sessao", usuario=usuario, resumo="Login bloqueado por tentativas"
+            )
             db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-mail ou senha incorretos.")
 
-    usuario.tentativas_login = 0
-    usuario.bloqueado_ate = None
+    ERROS_POR_IP.limpar(par)
     registrar_evento(db, "entrou", "sessao", usuario=usuario, resumo="Entrou no sistema")
     db.commit()
     _gravar_cookie(resposta, usuario)

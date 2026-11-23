@@ -4,8 +4,6 @@ Só sai daqui o que pode ser público: nada de valor de compra, custos, chassi, 
 dados de comprador ou o texto detalhado do provedor de procedência.
 """
 
-import time
-from collections import defaultdict, deque
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -15,6 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import fotos, schemas
 from app.config import obter_config
 from app.db import obter_db
+from app.limites import Janela, ip_do_cliente
 from app.models import LaudoProcedencia, Situacao, TipoVeiculo, Veiculo
 from app.rotas.procedencia import historico_do_veiculo
 from app.validacao import normalizar_placa
@@ -30,26 +29,20 @@ _FRASE = {
     "alerta": "Restrição encontrada — fale com a loja.",
 }
 
-# Limite simples por IP para a consulta de placa (30 por minuto), em memória.
-_JANELA, _LIMITE = 60.0, 30
-_acessos: dict[str, deque[float]] = defaultdict(deque)
+# Consulta de placa por IP: 10 por minuto e 60 por hora. Um visitante de verdade confere
+# poucas placas; adivinhar a placa completa de um anúncio (3.600 combinações) fica inviável.
+POR_MINUTO = Janela(10, 60)
+POR_HORA = Janela(60, 3600)
 
 
 def _limitar(request: Request) -> None:
-    ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-        request.client.host if request.client else "?"
-    )
-    agora = time.monotonic()
-    fila = _acessos[ip]
-    while fila and agora - fila[0] > _JANELA:
-        fila.popleft()
-    if len(fila) >= _LIMITE:
+    ip = ip_do_cliente(request)
+    if POR_MINUTO.estourou(ip) or POR_HORA.estourou(ip):
         raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS, "Muitas consultas. Tente de novo em um minuto."
+            status.HTTP_429_TOO_MANY_REQUESTS, "Muitas consultas. Tente de novo mais tarde."
         )
-    fila.append(agora)
-    if len(_acessos) > 10_000:  # não deixa o dicionário crescer sem fim
-        _acessos.clear()
+    POR_MINUTO.registrar(ip)
+    POR_HORA.registrar(ip)
 
 
 def mascarar(placa: str | None) -> str | None:
@@ -59,7 +52,14 @@ def mascarar(placa: str | None) -> str | None:
 def _laudo_valido(veiculo: Veiculo) -> LaudoProcedencia | None:
     """Laudo mais recente. Laudo ilustrativo só aparece em ambiente de demonstração."""
     demo = obter_config().dados_demo
-    return next((laudo for laudo in veiculo.laudos if demo or not laudo.ilustrativo), None)
+    return next(
+        (
+            laudo
+            for laudo in veiculo.laudos
+            if laudo.placa == veiculo.placa and (demo or not laudo.ilustrativo)
+        ),
+        None,
+    )
 
 
 def _publico(veiculo: Veiculo) -> schemas.VeiculoPublico:
