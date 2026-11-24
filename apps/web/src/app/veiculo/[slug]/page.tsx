@@ -46,7 +46,15 @@ async function carregarExtra<T>(caminho: string): Promise<T | null> {
 
 export async function generateMetadata({ params }: Parametros): Promise<Metadata> {
   const id = idDoSlug((await params).slug);
-  const veiculo = id === null ? null : await carregarVeiculo(id).catch(() => null);
+  let veiculo: VeiculoPublico | null = null;
+  if (id !== null) {
+    try {
+      veiculo = await carregarVeiculo(id);
+    } catch {
+      // vitrine fora do ar: a página mostra o aviso de erro, sem título de anúncio
+      return { title: { absolute: "RC Motos" }, robots: { index: false, follow: false } };
+    }
+  }
   if (!veiculo) return {}; // fora da vitrine: vale a metadata de reserva de ../layout.tsx
 
   const { cidade } = obterLoja();

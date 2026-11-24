@@ -474,7 +474,7 @@
   font-family: var(--font-display);
   /* nome curto enche o pôster numa linha; nome longo diminui até um piso e quebra em duas */
   font-size: clamp(1.45rem, max(9cqw, min(25cqw, calc(172cqw / var(--letras)))), 7rem);
-  line-height: 1.06;
+  line-height: 1.14;
   text-transform: uppercase;
   text-wrap: balance;
   overflow-wrap: anywhere;
@@ -686,7 +686,7 @@
   -webkit-line-clamp: 2;
   padding-top: 0.08em; /* folga para o acento não ser cortado */
   font-size: 1.3rem;
-  line-height: 1.1; /* em duas linhas, o acento de baixo não encosta na de cima */
+  line-height: 1.16; /* em duas linhas, o acento de baixo não encosta na de cima */
   overflow-wrap: anywhere;
 }
 .destaque .preco {
@@ -1071,7 +1071,7 @@
 }
 .cartao__nome {
   font-size: clamp(1.6rem, 2.1vw, 2rem);
-  line-height: 1.1;
+  line-height: 1.16;
   overflow-wrap: anywhere;
 }
 .cartao__nome a::after {
@@ -1496,7 +1496,7 @@
 .achado__nome {
   margin: 0.5rem 0;
   font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.08;
+  line-height: 1.16;
   overflow-wrap: anywhere;
 }
 .achado .ficha {
@@ -1512,7 +1512,7 @@
   font-family: var(--font-display);
   text-transform: uppercase;
   font-size: clamp(1.9rem, 4vw, 2.8rem);
-  line-height: 1.02;
+  line-height: 1.14;
 }
 .fora p + p {
   line-height: 1.6;
@@ -1798,7 +1798,7 @@ button.produto__principal {
 .produto__nome {
   margin-top: 0.9rem;
   font-size: clamp(2.6rem, 4.6vw, 4.8rem);
-  line-height: 1.06;
+  line-height: 1.14;
   overflow-wrap: anywhere;
 }
 .produto__preco {
@@ -1880,7 +1880,7 @@ button.produto__principal {
 .laudo-anuncio__titulo {
   margin-top: 0.9rem;
   font-size: clamp(2.5rem, 4.6vw, 4.4rem);
-  line-height: 1.02; /* o circunflexo de "procedência" não encosta na linha de cima */
+  line-height: 1.16; /* o circunflexo de "procedência" não encosta na linha de cima */
 }
 .laudo-anuncio__texto {
   max-width: 26rem;
@@ -1894,9 +1894,10 @@ button.produto__principal {
     align-items: start;
   }
 }
-/* o veredito em duas linhas ("Laudo em / preparação"): folga para til e cedilha */
-.site .laudo__titulo {
-  line-height: 1.06;
+/* veredito e marcos do laudo em duas linhas ("Laudo em / preparação"): folga para til e cedilha */
+.site .laudo__titulo,
+.site .estrada__titulo {
+  line-height: 1.16;
 }
 .outros {
   padding: clamp(3rem, 7vw, 5.5rem) var(--margem) clamp(3.5rem, 8vw, 6rem);
@@ -1933,7 +1934,7 @@ button.produto__principal {
   max-width: 13ch;
   margin-top: 0.9rem;
   font-size: clamp(2.9rem, 7vw, 6.5rem);
-  line-height: 1.02; /* til e acento agudo nas linhas de baixo */
+  line-height: 1.16; /* til e acento agudo nas linhas de baixo */
 }
 .aviso-pagina__texto {
   max-width: 32rem;
@@ -1976,7 +1977,7 @@ button.produto__principal {
 .galeria__nome {
   min-width: 0;
   font-size: 1.6rem;
-  line-height: 1.1;
+  line-height: 1.16;
   overflow-wrap: anywhere;
 }
 /* a foto ocupa o que sobra entre a barra e as setas, inteira, de pé ou deitada */
