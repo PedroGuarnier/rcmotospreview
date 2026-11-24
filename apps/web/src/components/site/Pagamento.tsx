@@ -4,6 +4,8 @@ import { useState } from "react";
 import { moeda, valorParaApi, valorParaCampo } from "@/lib/formato";
 import { linkWhats } from "@/lib/loja";
 import type { VeiculoPublico } from "@/lib/tipos";
+import { nomeComAno } from "./anuncio";
+import { Barras } from "./pecas";
 
 const FORMAS = [
   { valor: "avista", rotulo: "À vista", parcela: false },
@@ -13,8 +15,19 @@ const FORMAS = [
 type Forma = (typeof FORMAS)[number]["valor"];
 const PRAZOS = [6, 10, 12, 18, 24, 36, 48];
 
-export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; whatsapp: string | null }) {
-  const [veiculoId, setVeiculoId] = useState("");
+export function Pagamento({
+  veiculos,
+  whatsapp,
+  veiculoInicial = "",
+}: {
+  veiculos: VeiculoPublico[];
+  whatsapp: string | null;
+  /** id do veículo que já vem escolhido ("Montar proposta" na página do anúncio) */
+  veiculoInicial?: string;
+}) {
+  const [veiculoId, setVeiculoId] = useState(() =>
+    veiculos.some((v) => String(v.id) === veiculoInicial) ? veiculoInicial : "",
+  );
   const [forma, setForma] = useState<Forma>("loja");
   const [entrada, setEntrada] = useState("");
   const [prazo, setPrazo] = useState(2); // índice em PRAZOS
@@ -28,7 +41,7 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
   const linhas = [
     "Olá! Quero montar uma proposta pelo site.",
     veiculo
-      ? `• Veículo: ${veiculo.marca} ${veiculo.modelo}${veiculo.ano_modelo ? ` ${veiculo.ano_modelo}` : ""} (${moeda(veiculo.preco)})`
+      ? `• Veículo: ${nomeComAno(veiculo)} (${moeda(veiculo.preco)})`
       : "• Veículo: ainda estou escolhendo",
     `• Pagamento: ${FORMAS.find((f) => f.valor === forma)!.rotulo.toLowerCase()}`,
   ];
@@ -44,12 +57,7 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
       <div className="solar__grade">
         <div>
           <p className="sobretitulo" data-revelar>
-            <span className="barras" aria-hidden>
-              <i />
-              <i />
-              <i />
-            </span>
-            Como pagar
+            <Barras /> Como pagar
           </p>
           <h2 id="titulo-pagamento" className="outdoor solar__titulo" data-revelar>
             Do jeito que cabe.
@@ -57,7 +65,7 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
           <ol className="jeitos">
             <li data-revelar>
               <strong>À vista</strong>
-              <span>Fechou o valor, a moto é sua.</span>
+              <span>Fechou o valor, é só levar.</span>
             </li>
             <li data-revelar>
               <strong>Financiado pelo banco</strong>
@@ -85,9 +93,7 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
         >
           <div>
             <p className="outdoor proposta__titulo">Monte sua proposta</p>
-            <p style={{ color: "var(--nevoa)", marginTop: "0.5rem", lineHeight: 1.5 }}>
-              Você diz como quer pagar; a loja responde com os valores no WhatsApp.
-            </p>
+            <p className="proposta__apoio">Você diz como quer pagar; a loja responde com os valores no WhatsApp.</p>
           </div>
 
           <div>
@@ -96,7 +102,7 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
               <option value="">Ainda estou escolhendo</option>
               {veiculos.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.marca} {v.modelo} {v.ano_modelo ?? ""} — {moeda(v.preco)}
+                  {nomeComAno(v)} — {moeda(v.preco)}
                 </option>
               ))}
             </select>
@@ -149,7 +155,7 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
           )}
 
           <div>
-            <label className="troca" style={{ fontFamily: "inherit", letterSpacing: 0, textTransform: "none", fontSize: "1rem", color: "#fff", marginBottom: 0 }}>
+            <label className="troca">
               <input type="checkbox" checked={troca} onChange={(e) => setTroca(e.target.checked)} />
               Tenho uma usada para dar na troca
             </label>
@@ -160,16 +166,14 @@ export function Pagamento({ veiculos, whatsapp }: { veiculos: VeiculoPublico[]; 
                 placeholder="Qual? Ex.: CG 150, 2015"
                 value={usada}
                 onChange={(e) => setUsada(e.target.value)}
-                style={{ marginTop: "0.7rem" }}
+                className="troca__qual"
                 maxLength={80}
               />
             )}
           </div>
 
           <div>
-            <p className="dado" style={{ fontSize: "0.7rem", color: "var(--nevoa)", marginBottom: "0.5rem" }}>
-              A mensagem que vai para a loja
-            </p>
+            <p className="dado proposta__rotulo">A mensagem que vai para a loja</p>
             <p className="balao" aria-live="polite">
               {mensagem}
             </p>

@@ -23,7 +23,7 @@ export function generateMetadata(): Metadata {
   const { cidade } = obterLoja();
   const onde = cidade ? `em ${cidade}, Piauí` : "no Piauí";
   const titulo = `RC Motos — loja de motos e carros seminovos ${onde}`;
-  const descricao = `Motos e carros seminovos ${onde}, revisados e com laudo de procedência pela placa. Veja a vitrine, confira o laudo e chame a loja no WhatsApp.`;
+  const descricao = `Motos e carros seminovos ${onde}: veja a vitrine com fotos e preço, confira o laudo de procedência de cada veículo e chame a loja no WhatsApp.`;
   return {
     title: { absolute: titulo },
     description: descricao,

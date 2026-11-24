@@ -116,6 +116,71 @@ def test_catalogo_publico_mostra_so_o_que_esta_a_venda(anonimo, dono, demonstrac
         assert segredo not in texto, segredo
 
 
+def test_pagina_do_produto_so_para_veiculo_a_venda(anonimo, dono, demonstracao):
+    v = novo_veiculo(
+        dono,
+        placa="AAA1A11",
+        chassi="9C2KC1670NR000001",
+        renavam="123456789",
+        ano_fabricacao=2021,
+        ano_modelo=2022,
+        cor="Vermelha",
+        km=18500,
+        observacoes="Comprada do antigo dono em Timon",
+    )
+    dono.post(
+        f"/veiculos/{v['id']}/custos",
+        json={"tipo": "manutencao", "descricao": "Relação nova", "valor": "321", "data": None},
+    )
+    dono.post("/procedencia/consultar", json={"placa": "AAA1A11"})
+
+    resposta = anonimo.get(f"/publico/veiculos/{v['id']}")
+    assert resposta.status_code == 200
+    assert resposta.json() == {
+        "id": v["id"],
+        "tipo": "moto",
+        "marca": "Honda",
+        "modelo": "CG 160 Fan",
+        "ano_fabricacao": 2021,
+        "ano_modelo": 2022,
+        "cor": "Vermelha",
+        "km": 18500,
+        "preco": "14900.00",
+        "placa_mascarada": "AAA•••1",
+        "fotos": [],
+        "dias_na_loja": 0,
+        "semaforo": "verde",
+    }
+    # Nada interno vaza: compra, custos, chassi, RENAVAM, observações nem a placa completa
+    for segredo in (
+        "11500",
+        "321",
+        "valor_compra",
+        "custo",
+        "Relação nova",
+        "9C2KC1670NR000001",
+        "00123456789",
+        "AAA1A11",
+        "Timon",
+        "observacoes",
+    ):
+        assert segredo not in resposta.text, segredo
+
+    # Fora da vitrine a página deixa de existir: em preparação, vendido ou inexistente
+    em_preparo = novo_veiculo(dono, placa="BBB2B22", situacao="preparacao")
+    for veiculo_id in (em_preparo["id"], 999_999):
+        fora = anonimo.get(f"/publico/veiculos/{veiculo_id}")
+        assert fora.status_code == 404
+        assert fora.json() == {"detail": "Este veículo não está mais à venda."}
+    assert anonimo.get("/publico/veiculos/abc").status_code == 422
+
+    nova_venda(dono, v["id"])
+    vendido = anonimo.get(f"/publico/veiculos/{v['id']}")
+    assert vendido.status_code == 404
+    # ...e os dados do comprador nunca passam pelo site
+    assert "Maria" not in vendido.text and "cliente" not in vendido.text
+
+
 def test_procedencia_publica(anonimo, dono, demonstracao):
     v = novo_veiculo(dono, placa="AAA1A13", data_compra="2026-10-01")  # final 3 → atenção
     dono.post(

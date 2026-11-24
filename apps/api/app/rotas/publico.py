@@ -125,6 +125,15 @@ def catalogo(tipo: TipoVeiculo | None = None, db: Session = Depends(obter_db)):
     )
 
 
+@router.get("/veiculos/{veiculo_id}", response_model=schemas.VeiculoPublico)
+def anuncio(veiculo_id: int, db: Session = Depends(obter_db)):
+    """Página do produto no site: só existe enquanto o veículo está à venda."""
+    veiculo = db.scalar(_a_venda().where(Veiculo.id == veiculo_id))
+    if veiculo is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Este veículo não está mais à venda.")
+    return _publico(veiculo)
+
+
 @router.get("/veiculos/{veiculo_id}/procedencia", response_model=schemas.ProcedenciaPublica)
 def procedencia_do_anuncio(veiculo_id: int, db: Session = Depends(obter_db)):
     """Laudo aberto a partir do anúncio: a placa segue mascarada."""

@@ -1,227 +1,216 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Semaforo } from "@/components/placa/Laudo";
-import { numero } from "@/lib/formato";
+import { useEffect, useRef, useState } from "react";
 import type { TipoVeiculo, VeiculoPublico } from "@/lib/tipos";
+import { ORDENS, type Ordem, semAcento } from "./anuncio";
+import { Cartao } from "./Cartao";
+import { Barras } from "./pecas";
 
-const LAUDO = {
-  verde: "Laudo: nada consta",
-  amarelo: "Laudo: ponto de atenção",
-  vermelho: "Laudo: restrição",
-} as const;
+const POR_VEZ = 12;
 
-function Preco({ valor }: { valor: string }) {
-  const [inteiro] = Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 }).split(",");
+function IconeLupa() {
   return (
-    <p className="anuncio__preco">
-      <small>R$</small>
-      {inteiro}
-    </p>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m15.5 15.5 5 5" />
+    </svg>
   );
 }
 
-function Galeria({ veiculo, aoFechar }: { veiculo: VeiculoPublico; aoFechar: () => void }) {
-  const [i, setI] = useState(0);
-  const total = veiculo.fotos.length;
-
-  useEffect(() => {
-    const tecla = (e: KeyboardEvent) => {
-      if (e.key === "Escape") aoFechar();
-      if (e.key === "ArrowRight") setI((n) => (n + 1) % total);
-      if (e.key === "ArrowLeft") setI((n) => (n - 1 + total) % total);
-    };
-    document.addEventListener("keydown", tecla);
-    const anterior = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", tecla);
-      document.body.style.overflow = anterior;
-    };
-  }, [aoFechar, total]);
-
-  return (
-    <div className="galeria" role="dialog" aria-modal="true" aria-label={`Fotos: ${veiculo.marca} ${veiculo.modelo}`}>
-      <div className="galeria__barra">
-        <p className="outdoor" style={{ fontSize: "1.6rem" }}>
-          {veiculo.marca} {veiculo.modelo}
-        </p>
-        <button type="button" className="botao-redondo" onClick={aoFechar} aria-label="Fechar fotos" autoFocus>
-          ✕
-        </button>
-      </div>
-      <div className="galeria__foto">
-        {/* eslint-disable-next-line @next/next/no-img-element -- foto já otimizada pela API */}
-        <img src={veiculo.fotos[i].url} alt={`${veiculo.marca} ${veiculo.modelo}, foto ${i + 1} de ${total}`} />
-      </div>
-      <div className="galeria__nav">
-        <button
-          type="button"
-          className="botao-redondo"
-          onClick={() => setI((n) => (n - 1 + total) % total)}
-          aria-label="Foto anterior"
-          disabled={total < 2}
-        >
-          ←
-        </button>
-        <span className="dado" style={{ fontSize: "0.8rem" }}>
-          {i + 1} / {total}
-        </span>
-        <button
-          type="button"
-          className="botao-redondo"
-          onClick={() => setI((n) => (n + 1) % total)}
-          aria-label="Próxima foto"
-          disabled={total < 2}
-        >
-          →
-        </button>
-      </div>
-    </div>
-  );
-}
-
+/** A vitrine: grade de produtos igual ao estoque, com filtro por tipo, ordem e busca. */
 export function Vitrine({
   veiculos,
   ilustrativo,
-  linkVeiculo,
+  whatsapp,
   linkLoja,
-  aoVerLaudo,
+  tipo,
+  aoMudarTipo,
+  ordemInicial = "recentes",
+  buscaInicial = "",
 }: {
   veiculos: VeiculoPublico[];
   ilustrativo: boolean;
-  linkVeiculo: (v: VeiculoPublico) => string;
+  whatsapp: string | null;
   linkLoja: string;
-  aoVerLaudo: (v: VeiculoPublico) => void;
+  /** o filtro de tipo mora na página: os atalhos da primeira dobra também mexem nele */
+  tipo: TipoVeiculo | "";
+  aoMudarTipo: (tipo: TipoVeiculo | "") => void;
+  ordemInicial?: Ordem;
+  buscaInicial?: string;
 }) {
-  const [tipo, setTipo] = useState<TipoVeiculo | "">("");
-  const [fotos, setFotos] = useState<VeiculoPublico | null>(null);
-  const temMoto = veiculos.some((v) => v.tipo === "moto");
-  const temCarro = veiculos.some((v) => v.tipo === "carro");
-  const lista = tipo ? veiculos.filter((v) => v.tipo === tipo) : veiculos;
+  const [ordem, setOrdem] = useState<Ordem>(ordemInicial);
+  const [busca, setBusca] = useState(buscaInicial);
+  const [limite, setLimite] = useState(POR_VEZ);
+
+  const motos = veiculos.filter((v) => v.tipo === "moto").length;
+  const carros = veiculos.length - motos;
+
+  const termos = semAcento(busca).split(/\s+/).filter(Boolean);
+  let lista = veiculos.filter((v) => {
+    if (tipo && v.tipo !== tipo) return false;
+    const texto = semAcento(`${v.marca} ${v.modelo} ${v.ano_modelo ?? ""}`);
+    return termos.every((termo) => texto.includes(termo));
+  });
+  if (ordem !== "recentes") {
+    const sentido = ordem === "menor" ? 1 : -1;
+    lista = [...lista].sort((a, b) => sentido * (Number(a.preco) - Number(b.preco)));
+  }
+  const visiveis = lista.slice(0, limite);
+  const filtrando = tipo !== "" || termos.length > 0;
+
+  // Os filtros viajam no endereço: voltar de um anúncio (ou mandar o link) abre a vitrine igual.
+  // Sem a âncora, para o "voltar" devolver a rolagem onde estava e não o topo da seção.
+  const gravado = useRef({ tipo, ordem, busca });
+  useEffect(() => {
+    const antes = gravado.current;
+    // Só quando um filtro muda de verdade: ao montar, o histórico ainda é do roteador.
+    if (antes.tipo === tipo && antes.ordem === ordem && antes.busca === busca) return;
+    gravado.current = { tipo, ordem, busca };
+    const consulta = new URLSearchParams(window.location.search);
+    const por = (nome: string, valor: string) => (valor ? consulta.set(nome, valor) : consulta.delete(nome));
+    por("tipo", tipo);
+    por("ordem", ordem === "recentes" ? "" : ordem);
+    por("busca", busca.trim());
+    const texto = consulta.toString();
+    try {
+      window.history.replaceState(null, "", `${window.location.pathname}${texto ? `?${texto}` : ""}`);
+    } catch {
+      // alguns navegadores limitam trocas de endereço seguidas; o filtro funciona do mesmo jeito
+    }
+  }, [tipo, ordem, busca]);
+
+  function limpar() {
+    aoMudarTipo("");
+    setBusca("");
+    setLimite(POR_VEZ);
+  }
+
+  const filtros: [TipoVeiculo | "", string, number][] = [
+    ["", "Tudo", veiculos.length],
+    ["moto", "Motos", motos],
+    ["carro", "Carros", carros],
+  ];
 
   return (
     <section id="vitrine" className="claro vitrine" aria-labelledby="titulo-vitrine">
       <div className="vitrine__cabeca">
-        <div>
-          <p className="sobretitulo" data-revelar>
-            <span className="barras" aria-hidden>
-              <i />
-              <i />
-              <i />
-            </span>
-            Vitrine ligada ao estoque
-          </p>
-          <h2 id="titulo-vitrine" className="outdoor vitrine__titulo" data-revelar>
-            Na loja <em>agora.</em>
-          </h2>
-        </div>
-        {temMoto && temCarro && (
-          <div className="vitrine__filtros" role="group" aria-label="Filtrar vitrine" data-revelar>
-            {(
-              [
-                ["", `Tudo · ${veiculos.length}`],
-                ["moto", "Motos"],
-                ["carro", "Carros"],
-              ] as const
-            ).map(([valor, rotulo]) => (
-              <button
-                key={valor}
-                type="button"
-                className="filtro"
-                aria-pressed={tipo === valor}
-                onClick={() => setTipo(valor)}
-              >
-                {rotulo}
-              </button>
-            ))}
-          </div>
-        )}
+        <p className="sobretitulo" data-revelar>
+          <Barras /> Vitrine
+        </p>
+        <h2 id="titulo-vitrine" className="outdoor vitrine__titulo" data-revelar>
+          Na loja <em>agora.</em>
+        </h2>
       </div>
 
       {veiculos.length === 0 ? (
         <div className="vitrine__vazia" data-revelar>
-          <p>
-            A vitrine está sendo atualizada neste momento. Chame a loja e a gente diz o que tem no pátio hoje.
-          </p>
-          <a className="acao acao--tinta" href={linkLoja} target="_blank" rel="noopener" style={{ marginTop: "1.5rem" }}>
+          <p>A vitrine está sendo atualizada neste momento. Chame a loja e a gente diz o que tem no pátio hoje.</p>
+          <a className="acao acao--tinta" href={linkLoja} target="_blank" rel="noopener">
             Perguntar no WhatsApp
           </a>
         </div>
       ) : (
-        <div>
-          {lista.map((v, i) => (
-            <article key={v.id} className="anuncio" data-revelar>
-              <p className="dado anuncio__num" aria-hidden>
-                {String(i + 1).padStart(2, "0")}
-              </p>
-
-              {v.fotos.length > 0 ? (
-                <button
-                  type="button"
-                  className="anuncio__midia"
-                  onClick={() => setFotos(v)}
-                  aria-label={`Ver ${v.fotos.length} ${v.fotos.length === 1 ? "foto" : "fotos"} de ${v.marca} ${v.modelo}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- miniatura já otimizada pela API */}
-                  <img src={v.fotos[0].url} alt="" loading="lazy" />
-                  {v.fotos.length > 1 && <span className="dado anuncio__conta">{v.fotos.length} fotos</span>}
-                </button>
-              ) : (
-                <div className="anuncio__midia" style={{ cursor: "default" }} aria-hidden>
-                  <span className="anuncio__poster">
-                    <b>{v.marca}</b>
-                    <small className="dado">Fotos em breve</small>
-                  </span>
+        <>
+          {veiculos.length > 1 && (
+            <div className="vitrine__barra">
+              {motos > 0 && carros > 0 && (
+                <div className="vitrine__filtros" role="group" aria-label="Filtrar por tipo">
+                  {filtros.map(([valor, rotulo, quantos]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      className="filtro"
+                      aria-pressed={tipo === valor}
+                      onClick={() => {
+                        aoMudarTipo(valor);
+                        setLimite(POR_VEZ);
+                      }}
+                    >
+                      {rotulo} <span>{quantos}</span>
+                    </button>
+                  ))}
                 </div>
               )}
-
-              <div>
-                <h3 className="outdoor anuncio__nome">
-                  {v.marca} {v.modelo}
-                </h3>
-                <p className="dado anuncio__ficha">
-                  {v.ano_modelo && (
-                    <span>
-                      {v.ano_fabricacao && v.ano_fabricacao !== v.ano_modelo ? `${v.ano_fabricacao}/` : ""}
-                      {v.ano_modelo}
-                    </span>
-                  )}
-                  {v.km !== null && <span>{numero(v.km)} km</span>}
-                  {v.cor && <span>{v.cor}</span>}
-                  {v.placa_mascarada && <span>Placa {v.placa_mascarada}</span>}
-                </p>
-                <div className="anuncio__selos">
-                  {v.semaforo && (
-                    <button type="button" className="selo" onClick={() => aoVerLaudo(v)}>
-                      <Semaforo cor={v.semaforo} deitado tamanho="0.72rem" />
-                      {LAUDO[v.semaforo]}
-                    </button>
-                  )}
-                  {v.dias_na_loja <= 7 && <span className="selo selo--novo">Chegou esta semana</span>}
-                </div>
+              <div className="vitrine__campos">
+                <label className="campo campo--busca">
+                  <span className="so-leitor">Buscar por marca ou modelo</span>
+                  <IconeLupa />
+                  <input
+                    type="search"
+                    placeholder="Buscar marca ou modelo"
+                    autoComplete="off"
+                    enterKeyHint="search"
+                    value={busca}
+                    onChange={(e) => {
+                      setBusca(e.target.value);
+                      setLimite(POR_VEZ);
+                    }}
+                  />
+                </label>
+                <label className="campo campo--ordem">
+                  <span className="dado">Ordenar</span>
+                  <select value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)}>
+                    {ORDENS.map((o) => (
+                      <option key={o.valor} value={o.valor}>
+                        {o.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
+            </div>
+          )}
 
-              <div className="anuncio__fecho">
-                <Preco valor={v.preco} />
-                <div className="anuncio__acoes">
-                  <a className="acao acao--tinta" href={linkVeiculo(v)} target="_blank" rel="noopener">
-                    Quero essa
-                  </a>
-                  <button type="button" className="acao acao--linha acao--sem-seta" onClick={() => aoVerLaudo(v)}>
-                    Ver procedência
-                  </button>
-                </div>
+          <p className="dado vitrine__conta" role="status">
+            {filtrando
+              ? `${lista.length} de ${veiculos.length} ${veiculos.length === 1 ? "veículo" : "veículos"}`
+              : `${veiculos.length} ${veiculos.length === 1 ? "veículo" : "veículos"}`}
+            {filtrando && (
+              <button type="button" onClick={limpar}>
+                Limpar filtros
+              </button>
+            )}
+          </p>
+
+          {lista.length === 0 ? (
+            <div className="vitrine__vazia">
+              <p>
+                Nada encontrado com esse filtro. Pode ser que o veículo que você procura esteja chegando — pergunte à
+                loja.
+              </p>
+              <div className="vitrine__vazia-acoes">
+                <button type="button" className="acao acao--tinta acao--sem-seta" onClick={limpar}>
+                  Limpar filtros
+                </button>
+                <a className="acao acao--linha" href={linkLoja} target="_blank" rel="noopener">
+                  Perguntar no WhatsApp
+                </a>
               </div>
-            </article>
-          ))}
+            </div>
+          ) : (
+            <div className="grade">
+              {visiveis.map((v, i) => (
+                <Cartao key={v.id} veiculo={v} whatsapp={whatsapp} ordem={i % POR_VEZ} />
+              ))}
+            </div>
+          )}
+
+          {lista.length > limite && (
+            <div className="vitrine__mais">
+              <button type="button" className="acao acao--linha acao--sem-seta" onClick={() => setLimite(limite + POR_VEZ)}>
+                Mostrar mais {Math.min(POR_VEZ, lista.length - limite)}
+              </button>
+              <p className="dado">
+                {visiveis.length} de {lista.length}
+              </p>
+            </div>
+          )}
+
           {ilustrativo && (
             <p className="dado vitrine__nota">Ambiente de demonstração: veículos, preços e laudos ilustrativos.</p>
           )}
-        </div>
+        </>
       )}
-
-      {fotos && <Galeria veiculo={fotos} aoFechar={() => setFotos(null)} />}
     </section>
   );
 }
