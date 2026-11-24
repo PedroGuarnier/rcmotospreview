@@ -182,12 +182,10 @@ def listar(
     return [_resumo(v, com_custos) for v in db.scalars(consulta)]
 
 
-@router.post("", response_model=schemas.VeiculoDetalhe, status_code=status.HTTP_201_CREATED)
-def criar(
-    dados: schemas.VeiculoCriar,
-    usuario: Usuario = Depends(exigir(P.estoque_editar)),
-    db: Session = Depends(obter_db),
-):
+def criar_veiculo(db: Session, dados: schemas.VeiculoCriar, usuario: Usuario) -> Veiculo:
+    """Cadastra o veículo. É o único caminho de criação: formulário e assistente passam por aqui,
+    com as mesmas regras (placa e chassi sem repetição, situação, laudos de procedência)."""
+    db.info["usuario"] = usuario  # quem aparece no audit log
     _conferir_duplicados(db, dados.placa, dados.chassi)
     veiculo = Veiculo(**dados.model_dump(exclude={"situacao"}), situacao=Situacao.compra)
     _conferir_situacao(veiculo, dados.situacao)
@@ -196,7 +194,16 @@ def criar(
     db.flush()
     procedencia.ligar_laudos_ao_veiculo(db, veiculo)
     db.commit()
-    return _detalhe(_obter(db, veiculo.id), usuario)
+    return _obter(db, veiculo.id)
+
+
+@router.post("", response_model=schemas.VeiculoDetalhe, status_code=status.HTTP_201_CREATED)
+def criar(
+    dados: schemas.VeiculoCriar,
+    usuario: Usuario = Depends(exigir(P.estoque_editar)),
+    db: Session = Depends(obter_db),
+):
+    return _detalhe(criar_veiculo(db, dados, usuario), usuario)
 
 
 @router.get("/{veiculo_id}", response_model=schemas.VeiculoDetalhe)

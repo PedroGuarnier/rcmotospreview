@@ -1,0 +1,80 @@
+/* Tela do assistente: a conversa ocupa a altura da janela e o campo de texto fica preso embaixo. */
+
+.assistente {
+  /* O que fica por baixo do campo: a barra inferior no celular, uma folga no computador. */
+  --rodape: calc(4rem + env(safe-area-inset-bottom));
+  /* Espaço que o <main> da área logada já reserva embaixo (pb-28 / lg:pb-12). */
+  --folga-do-main: 7rem;
+  display: flex;
+  flex-direction: column;
+  /* --topo é medido na tela (muda com a faixa de demonstração). */
+  min-height: calc(100dvh - var(--topo, 15rem) - var(--rodape));
+  margin-bottom: calc(var(--rodape) - var(--folga-do-main));
+}
+
+.assistente__campo {
+  position: sticky;
+  /* --teclado vem do visualViewport: com o teclado aberto, o campo sobe junto. */
+  bottom: max(var(--rodape), var(--teclado, 0px));
+  z-index: 20;
+  margin-top: auto;
+  padding-top: 1.5rem;
+  padding-bottom: 0.5rem;
+  background: linear-gradient(to top, var(--color-gelo) 70%, transparent);
+}
+
+@media (min-width: 64rem) {
+  .assistente {
+    --rodape: 1rem;
+    --folga-do-main: 3rem;
+  }
+}
+
+/* O foco contorna a caixa inteira (texto + botão), não o retângulo do textarea. */
+.assistente__caixa:focus-within {
+  outline: 3px solid var(--color-amarelo);
+  outline-offset: 2px;
+  border-color: var(--color-azul);
+}
+.assistente__caixa textarea:focus-visible {
+  outline: none;
+}
+
+.assistente__pontos {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  height: 1.25rem;
+}
+.assistente__pontos i {
+  display: block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-suave);
+  animation: assistente-ponto 1s ease-in-out infinite;
+}
+.assistente__pontos i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.assistente__pontos i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes assistente-ponto {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-0.2rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistente__pontos i {
+    animation: none;
+    opacity: 0.6;
+  }
+}

@@ -121,12 +121,23 @@ function Estoque() {
         sobre="Motos e carros"
         acoes={
           pode("estoque.editar") && (
-            <Link
-              href="/estoque/novo"
-              className="inline-flex min-h-11 items-center rounded-full bg-azul px-5 text-[15px] font-semibold text-white hover:bg-azul-escuro"
-            >
-              + Novo veículo
-            </Link>
+            <>
+              <Link
+                href="/assistente"
+                aria-label="Cadastrar por mensagem"
+                className="order-last inline-flex min-h-11 items-center rounded-full px-4 text-[15px] font-semibold text-azul hover:bg-azul/10 sm:order-none"
+              >
+                {/* no celular o rótulo encurta e vem depois do botão: "+ Novo veículo · Por mensagem" */}
+                <span className="hidden sm:inline">Cadastrar por mensagem</span>
+                <span className="sm:hidden">Por mensagem</span>
+              </Link>
+              <Link
+                href="/estoque/novo"
+                className="inline-flex min-h-11 items-center rounded-full bg-azul px-5 text-[15px] font-semibold text-white hover:bg-azul-escuro"
+              >
+                + Novo veículo
+              </Link>
+            </>
           )
         }
       >

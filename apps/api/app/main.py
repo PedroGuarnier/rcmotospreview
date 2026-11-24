@@ -9,6 +9,7 @@ from app.config import obter_config
 from app.db import SessionLocal
 from app.rotas import (
     aportes,
+    assistente,
     auth,
     clientes,
     comissoes,
@@ -45,6 +46,7 @@ for modulo in (
     historico,
     procedencia,
     configuracoes,
+    assistente,
     publico,
 ):
     app.include_router(modulo.router)

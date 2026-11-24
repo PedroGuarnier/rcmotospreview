@@ -307,3 +307,85 @@ export interface ProcedenciaPublica {
   itens: ItemLaudo[];
   historico: MarcoHistorico[];
 }
+
+// ---------- Assistente (cadastro de veículo por mensagem) ----------
+
+/** O que o assistente já entendeu: os campos do cadastro, todos opcionais. */
+export interface RascunhoAssistente {
+  tipo: TipoVeiculo | null;
+  marca: string | null;
+  modelo: string | null;
+  ano_fabricacao: number | null;
+  ano_modelo: number | null;
+  cor: string | null;
+  km: number | null;
+  placa: string | null;
+  chassi: string | null;
+  renavam: string | null;
+  valor_compra: string | null;
+  preco_venda: string | null;
+  situacao: Situacao | null;
+  observacoes: string | null;
+}
+
+/** Vai e volta a cada mensagem: o servidor não guarda a conversa. */
+export interface EstadoAssistente {
+  rascunho: RascunhoAssistente;
+  /** campo que o assistente acabou de perguntar, ou "confirmacao" */
+  aguardando:
+    | "tipo"
+    | "marca"
+    | "modelo"
+    | "valor_compra"
+    | "preco_venda"
+    | "placa"
+    | "chassi"
+    | "confirmacao"
+    | null;
+}
+
+export interface ItemFicha {
+  campo: string;
+  rotulo: string;
+  /** já formatado pelo servidor: "R$ 11.500,00", "18.500 km", "ABC-1D23" */
+  valor: string;
+  /** lucro previsto e imposto estimado (só com custos.ver) */
+  calculado: boolean;
+}
+
+export interface CampoAssistente {
+  campo: string;
+  rotulo: string;
+}
+
+export interface VeiculoCriadoAssistente {
+  id: number;
+  descricao: string;
+  placa: string | null;
+}
+
+/** Veículo que já usa a placa ou o chassi do rascunho. */
+export interface DuplicadoAssistente {
+  id: number;
+  descricao: string;
+  campo: "placa" | "chassi";
+}
+
+export interface RespostaAssistente {
+  /** texto simples, com quebras de linha */
+  resposta: string;
+  estado: EstadoAssistente;
+  ficha: ItemFicha[];
+  /** obrigatórios que faltam */
+  faltando: CampoAssistente[];
+  /** opcionais importantes que faltam */
+  sugeridos: CampoAssistente[];
+  /** obrigatórios preenchidos e válidos */
+  pronto: boolean;
+  acao: "nenhuma" | "confirmar" | "cancelado" | "criado";
+  /** quando acao === "criado" */
+  veiculo: VeiculoCriadoAssistente | null;
+  duplicado: DuplicadoAssistente | null;
+  /** suposições feitas ("Considerei 2022 como ano de fabricação e do modelo.") */
+  avisos: string[];
+}

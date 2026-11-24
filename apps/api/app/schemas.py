@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import (
     AfterValidator,
@@ -550,3 +550,92 @@ class ProcedenciaPublica(BaseModel):
     ilustrativo: bool
     itens: list[ItemLaudo]
     historico: list[MarcoHistorico]
+
+
+# ---------- Assistente (cadastro de veículo por mensagem) ----------
+
+
+class AssistenteRascunho(BaseModel):
+    """O que o assistente já entendeu: os campos do cadastro, com os mesmos limites, todos
+    opcionais. Volta do navegador a cada mensagem, então os textos têm o tamanho das colunas."""
+
+    tipo: TipoVeiculo | None = None
+    marca: TextoOpcional = Field(None, max_length=60)
+    modelo: TextoOpcional = Field(None, max_length=120)
+    ano_fabricacao: int | None = Field(None, ge=1950, le=2100)
+    ano_modelo: int | None = Field(None, ge=1950, le=2100)
+    cor: TextoOpcional = Field(None, max_length=40)
+    km: int | None = Field(None, ge=0, le=9_999_999)
+    placa: Placa = None
+    chassi: Chassi = None
+    renavam: Renavam = None
+    valor_compra: Valor | None = None
+    preco_venda: ValorPositivo | None = None
+    situacao: Situacao | None = None
+    observacoes: TextoOpcional = None
+
+
+class AssistenteEstado(BaseModel):
+    """Vai e volta a cada mensagem: o servidor não guarda a conversa."""
+
+    rascunho: AssistenteRascunho = Field(default_factory=AssistenteRascunho)
+    # campo que o assistente acabou de perguntar, ou "confirmacao"
+    aguardando: (
+        Literal[
+            "tipo",
+            "marca",
+            "modelo",
+            "valor_compra",
+            "preco_venda",
+            "placa",
+            "chassi",
+            "confirmacao",
+        ]
+        | None
+    ) = None
+
+
+class AssistenteMensagem(BaseModel):
+    mensagem: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)
+    ]
+    estado: AssistenteEstado | None = None
+
+
+class AssistenteItemFicha(BaseModel):
+    campo: str
+    rotulo: str
+    valor: str  # já formatado para a tela: "R$ 11.500,00", "18.500 km", "ABC-1D23"
+    calculado: bool = False  # lucro previsto e imposto estimado (só com custos.ver)
+
+
+class AssistenteCampo(BaseModel):
+    campo: str
+    rotulo: str
+
+
+class AssistenteVeiculo(BaseModel):
+    id: int
+    descricao: str
+    placa: str | None
+
+
+class AssistenteDuplicado(BaseModel):
+    """Veículo que já usa a placa ou o chassi do rascunho."""
+
+    id: int
+    descricao: str
+    campo: Literal["placa", "chassi"]
+
+
+class AssistenteResposta(BaseModel):
+    resposta: str  # texto simples, com quebras de linha
+    estado: AssistenteEstado
+    ficha: list[AssistenteItemFicha]
+    faltando: list[AssistenteCampo]  # obrigatórios que faltam
+    sugeridos: list[AssistenteCampo]  # opcionais importantes que faltam
+    pronto: bool  # obrigatórios preenchidos e válidos
+    acao: Literal["nenhuma", "confirmar", "cancelado", "criado"]
+    veiculo: AssistenteVeiculo | None = None  # quando acao == "criado"
+    duplicado: AssistenteDuplicado | None = None
+    avisos: list[str]  # suposições feitas ("Considerei 2022 como ano de fabricação e do modelo.")

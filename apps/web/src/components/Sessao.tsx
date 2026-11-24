@@ -8,6 +8,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { ErroApi, api, buscar } from "@/lib/api";
 import { PERFIL } from "@/lib/formato";
 import type { Eu, Permissao } from "@/lib/tipos";
+import { esquecerConversas } from "./assistente/conversa";
 import { Carregando } from "./ui";
 
 const Contexto = createContext<Eu | null>(null);
@@ -31,6 +32,12 @@ const ICONES = {
       <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
       <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
       <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  assistente: (
+    <>
+      <path d="M20 4.5H4A1.5 1.5 0 0 0 2.5 6v9A1.5 1.5 0 0 0 4 16.5h3.5V20l4.5-3.5h8a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 20 4.5Z" />
+      <path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01" />
     </>
   ),
   vendas: (
@@ -109,6 +116,8 @@ interface ItemMenu {
 const MENU: ItemMenu[] = [
   { href: "/painel", rotulo: "Painel", icone: "painel", permissao: "painel.ver", principal: true },
   { href: "/estoque", rotulo: "Estoque", icone: "estoque", permissao: "estoque.ver", principal: true },
+  // cadastro de veículo por mensagem: quem pode usar o formulário de cadastro
+  { href: "/assistente", rotulo: "Assistente", icone: "assistente", permissao: "estoque.editar", principal: true },
   { href: "/procedencia", rotulo: "Procedência", icone: "procedencia", permissao: "procedencia.consultar" },
   { href: "/vendas", rotulo: "Vendas", icone: "vendas", principal: true },
   { href: "/comissoes", rotulo: "Comissões", icone: "comissoes", principal: true },
@@ -157,6 +166,7 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
   async function sair() {
     await api("/auth/sair", { metodo: "POST" }).catch(() => null);
     await mutate(() => true, undefined, { revalidate: false }); // limpa os dados em memória
+    esquecerConversas(); // e o rascunho do assistente
     router.replace("/login");
   }
 
