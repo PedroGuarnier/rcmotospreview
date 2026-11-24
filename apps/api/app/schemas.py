@@ -197,6 +197,8 @@ class VendaDoVeiculo(BaseModel):
     cliente: PessoaRef
     vendedor: PessoaRef
     lucro: Decimal | None = None
+    imposto: Decimal | None = None
+    lucro_liquido: Decimal | None = None
 
 
 class VeiculoOut(BaseModel):
@@ -223,6 +225,8 @@ class VeiculoOut(BaseModel):
 
 
 class VeiculoDetalhe(VeiculoOut):
+    # custos.ver: imposto estimado se vender pelo preço anunciado, com a alíquota de hoje
+    imposto_previsto: Decimal | None = None
     chassi: str | None
     renavam: str | None
     data_compra: date | None
@@ -342,6 +346,9 @@ class VendaOut(BaseModel):
     valor_compra: Decimal | None = None
     total_custos: Decimal | None = None
     lucro: Decimal | None = None
+    imposto_aliquota: Decimal | None = None
+    imposto: Decimal | None = None
+    lucro_liquido: Decimal | None = None
     # comissoes.ver_todas ou a própria
     comissao: ComissaoResumo | None = None
 
@@ -421,6 +428,8 @@ class NumerosPeriodo(BaseModel):
     vendas: int
     faturamento: Decimal
     lucro: Decimal
+    imposto: Decimal  # estimado, sobre a margem de cada venda
+    lucro_liquido: Decimal
     ticket_medio: Decimal | None
 
 
@@ -453,6 +462,17 @@ class PainelOut(BaseModel):
     parados: list[VeiculoParado]
     dias_parado_alerta: int
     comissoes_mes: list[ComissaoPorVendedor]
+
+
+# ---------- Configurações da loja ----------
+
+
+class ConfiguracaoOut(BaseModel):
+    imposto_margem_aliquota: Decimal
+
+
+class ConfiguracaoEditar(BaseModel):
+    imposto_margem_aliquota: Annotated[Decimal, Field(ge=0, le=100, decimal_places=2)]
 
 
 # ---------- Procedência ----------

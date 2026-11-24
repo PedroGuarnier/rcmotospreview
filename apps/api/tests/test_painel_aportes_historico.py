@@ -46,6 +46,8 @@ def test_painel(dono, gerente, financeiro, vendedor, usuario_vendedor, db):
         "vendas": 2,
         "faturamento": "44500.00",
         "lucro": "9000.00",
+        "imposto": "0.00",  # nenhuma alíquota configurada
+        "lucro_liquido": "9000.00",
         "ticket_medio": "22250.00",
     }
     assert mes["moto"]["ticket_medio"] == "14500.00"

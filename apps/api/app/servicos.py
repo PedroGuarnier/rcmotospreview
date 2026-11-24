@@ -11,6 +11,7 @@ from app import schemas
 from app.models import (
     Cliente,
     Comissao,
+    Configuracao,
     RegraComissao,
     Situacao,
     StatusComissao,
@@ -32,6 +33,18 @@ def erro(codigo: int, mensagem: str) -> HTTPException:
 def calcular_lucro(valor_venda: Decimal, valor_compra: Decimal, total_custos: Decimal) -> Decimal:
     """Lucro = venda − compra − custos (contrato, cláusula 1)."""
     return valor_venda - valor_compra - total_custos
+
+
+def calcular_imposto(valor_venda: Decimal, valor_compra: Decimal, aliquota: Decimal) -> Decimal:
+    """Imposto estimado = alíquota × margem (venda − compra). Margem negativa não gera imposto."""
+    margem = max(valor_venda - valor_compra, Decimal(0))
+    return (margem * aliquota / 100).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def aliquota_imposto(db: Session) -> Decimal:
+    """Alíquota configurada pelo dono (0 enquanto ninguém configurou)."""
+    configuracao = db.get(Configuracao, 1)
+    return configuracao.imposto_margem_aliquota if configuracao else Decimal("0.00")
 
 
 def calcular_comissao(
@@ -96,6 +109,7 @@ def registrar_venda(db: Session, dados: schemas.VendaCriar, usuario: Usuario) ->
     cliente = _obter_ou_criar_cliente(db, dados)
     total_custos = veiculo.total_custos
     lucro = calcular_lucro(dados.valor, veiculo.valor_compra, total_custos)
+    aliquota = aliquota_imposto(db)
     venda = Venda(
         veiculo=veiculo,
         cliente=cliente,
@@ -112,6 +126,8 @@ def registrar_venda(db: Session, dados: schemas.VendaCriar, usuario: Usuario) ->
         valor_compra=veiculo.valor_compra,
         total_custos=total_custos,
         lucro=lucro,
+        imposto_aliquota=aliquota,
+        imposto=calcular_imposto(dados.valor, veiculo.valor_compra, aliquota),
         observacoes=dados.observacoes,
         status=StatusVenda.ativa,
     )
@@ -151,6 +167,7 @@ def recalcular_venda_do_veiculo(veiculo: Veiculo) -> None:
     """Custo lançado/removido ou valor de compra corrigido depois da venda: refaz o lucro.
 
     A comissão acompanha enquanto estiver pendente; depois de paga, fica como foi paga.
+    O imposto é refeito com a alíquota guardada na venda, não com a de hoje.
     """
     venda = veiculo.venda_ativa
     if venda is None:
@@ -158,6 +175,7 @@ def recalcular_venda_do_veiculo(veiculo: Veiculo) -> None:
     venda.valor_compra = veiculo.valor_compra
     venda.total_custos = veiculo.total_custos
     venda.lucro = calcular_lucro(venda.valor, venda.valor_compra, venda.total_custos)
+    venda.imposto = calcular_imposto(venda.valor, venda.valor_compra, venda.imposto_aliquota)
     comissao = venda.comissao
     if comissao is not None and comissao.status == StatusComissao.pendente:
         comissao.valor = calcular_comissao(

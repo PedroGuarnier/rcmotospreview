@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { api, buscar } from "@/lib/api";
-import { FORMA, hojeIso, moeda, telefone, valorParaApi, valorParaCampo } from "@/lib/formato";
-import type { Cliente, FormaPagamento, PessoaRef, Veiculo, Venda } from "@/lib/tipos";
+import { FORMA, hojeIso, moeda, percentual, telefone, valorParaApi, valorParaCampo } from "@/lib/formato";
+import type { Cliente, Configuracao, FormaPagamento, PessoaRef, Veiculo, Venda } from "@/lib/tipos";
 import { useEu, usePode } from "./Sessao";
 import { Aviso, Botao, Campo, CampoValor, Modal, Rotulo, Selecao, useAcao } from "./ui";
 
@@ -56,6 +56,13 @@ export function VenderModal({
   const valorApi = valorParaApi(valor);
   const lucro =
     veiculo.custo_total !== null && valorApi !== null ? Number(valorApi) - Number(veiculo.custo_total) : null;
+  // Mesma conta da API: alíquota × margem (venda − compra), sem imposto em margem negativa.
+  const { data: configuracao } = useSWR<Configuracao>(pode("custos.ver") ? "/configuracoes" : null, buscar);
+  const aliquota = Number(configuracao?.imposto_margem_aliquota ?? 0);
+  const imposto =
+    lucro !== null && aliquota > 0 && veiculo.valor_compra !== null
+      ? Math.round(Math.max(Number(valorApi) - Number(veiculo.valor_compra), 0) * aliquota) / 100
+      : 0;
 
   function confirmar(e: React.FormEvent) {
     e.preventDefault();
@@ -216,6 +223,14 @@ export function VenderModal({
             Lucro desta venda:{" "}
             <b className={`num ${lucro < 0 ? "text-vermelho" : "text-verde"}`}>{moeda(lucro)}</b>
             <span className="text-suave"> = venda − compra − custos ({moeda(veiculo.custo_total)})</span>
+            {imposto > 0 && (
+              <span className="mt-1 block">
+                Imposto estimado ({percentual(aliquota)} da margem): <b className="num">{moeda(imposto)}</b> · líquido{" "}
+                <b className={`num ${lucro - imposto < 0 ? "text-vermelho" : "text-verde"}`}>
+                  {moeda(lucro - imposto)}
+                </b>
+              </span>
+            )}
           </p>
         )}
         <Aviso>{erro}</Aviso>

@@ -62,7 +62,16 @@ function Conteudo() {
           valor={moeda(mes.total.faturamento)}
           detalhe={`${mes.total.vendas} ${mes.total.vendas === 1 ? "venda" : "vendas"}`}
         />
-        <Numero largo rotulo="Lucro do mês" valor={moeda(mes.total.lucro)} detalhe={margem} />
+        <Numero
+          largo
+          rotulo="Lucro do mês"
+          valor={moeda(mes.total.lucro)}
+          detalhe={
+            Number(mes.total.imposto) > 0
+              ? `líquido ${moeda(mes.total.lucro_liquido)} · imposto estimado ${moeda(mes.total.imposto)}`
+              : margem
+          }
+        />
         <Numero
           rotulo="Ticket médio · motos"
           valor={moeda(mes.moto.ticket_medio)}

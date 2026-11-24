@@ -106,6 +106,7 @@ def _enum(tipo: type[enum.Enum]) -> SAEnum:
 
 
 Dinheiro = Numeric(12, 2)
+Percentual = Numeric(5, 2)
 
 
 class Usuario(Base):
@@ -294,6 +295,14 @@ class Venda(Base):
     valor_compra: Mapped[Decimal] = mapped_column(Dinheiro)
     total_custos: Mapped[Decimal] = mapped_column(Dinheiro)
     lucro: Mapped[Decimal] = mapped_column(Dinheiro)
+    # Imposto estimado sobre a margem (venda − compra), com a alíquota do dia da baixa.
+    # Não entra em `lucro` (base da comissão): lucro líquido = lucro − imposto.
+    imposto_aliquota: Mapped[Decimal] = mapped_column(
+        Percentual, default=Decimal("0"), server_default=text("0")
+    )
+    imposto: Mapped[Decimal] = mapped_column(
+        Dinheiro, default=Decimal("0"), server_default=text("0")
+    )
     status: Mapped[StatusVenda] = mapped_column(_enum(StatusVenda), default=StatusVenda.ativa)
     cancelada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
@@ -346,6 +355,21 @@ class Aporte(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     registrado_por: Mapped[Usuario | None] = relationship()
+
+
+class Configuracao(Base):
+    """Ajustes da loja feitos pelo dono na tela. Linha única (id = 1)."""
+
+    __tablename__ = "configuracao"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Alíquota (%) do imposto estimado sobre a margem de cada venda. 0 = não calcula.
+    imposto_margem_aliquota: Mapped[Decimal] = mapped_column(
+        Percentual, default=Decimal("0"), server_default=text("0")
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class LaudoProcedencia(Base):

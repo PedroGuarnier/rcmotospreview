@@ -48,6 +48,24 @@ function Dado({ rotulo, children }: { rotulo: string; children: React.ReactNode 
   );
 }
 
+/** Imposto estimado sobre a margem e o lucro que sobra; some enquanto não há alíquota configurada. */
+function LinhasImposto({ imposto, lucro }: { imposto: string | null; lucro: string }) {
+  if (imposto === null || Number(imposto) <= 0) return null;
+  const liquido = Number(lucro) - Number(imposto);
+  return (
+    <>
+      <div className="flex justify-between">
+        <dt>Imposto estimado sobre a margem</dt>
+        <dd>− {moeda(imposto)}</dd>
+      </div>
+      <div className="flex justify-between font-bold">
+        <dt>Lucro líquido</dt>
+        <dd className={liquido < 0 ? "text-vermelho" : "text-verde"}>{moeda(liquido)}</dd>
+      </div>
+    </>
+  );
+}
+
 function Secao({ titulo, acoes, children }: { titulo: string; acoes?: React.ReactNode; children: React.ReactNode }) {
   return (
     <Cartao className="p-5 sm:p-6">
@@ -247,18 +265,24 @@ function Custos({ v, aoMudar }: { v: VeiculoDetalhe; aoMudar: (v: VeiculoDetalhe
           <dd>{moeda(v.custo_total)}</dd>
         </div>
         {v.venda?.lucro != null ? (
-          <div className="flex justify-between font-bold">
-            <dt>Lucro da venda</dt>
-            <dd className={Number(v.venda.lucro) < 0 ? "text-vermelho" : "text-verde"}>{moeda(v.venda.lucro)}</dd>
-          </div>
+          <>
+            <div className="flex justify-between font-bold">
+              <dt>Lucro da venda</dt>
+              <dd className={Number(v.venda.lucro) < 0 ? "text-vermelho" : "text-verde"}>{moeda(v.venda.lucro)}</dd>
+            </div>
+            <LinhasImposto imposto={v.venda.imposto} lucro={v.venda.lucro} />
+          </>
         ) : (
           v.lucro_previsto !== null && (
-            <div className="flex justify-between font-bold">
-              <dt>Lucro previsto (no preço anunciado)</dt>
-              <dd className={Number(v.lucro_previsto) < 0 ? "text-vermelho" : "text-verde"}>
-                {moeda(v.lucro_previsto)}
-              </dd>
-            </div>
+            <>
+              <div className="flex justify-between font-bold">
+                <dt>Lucro previsto (no preço anunciado)</dt>
+                <dd className={Number(v.lucro_previsto) < 0 ? "text-vermelho" : "text-verde"}>
+                  {moeda(v.lucro_previsto)}
+                </dd>
+              </div>
+              <LinhasImposto imposto={v.imposto_previsto} lucro={v.lucro_previsto} />
+            </>
           )
         )}
       </dl>

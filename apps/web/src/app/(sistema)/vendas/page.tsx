@@ -14,6 +14,7 @@ import {
   mesLongo,
   mesVizinho,
   moeda,
+  percentual,
   regraDescrita,
   telefone,
 } from "@/lib/formato";
@@ -75,6 +76,18 @@ function DetalheVenda({ venda, aoFechar, aoMudar }: { venda: Venda; aoFechar: ()
             <Linha rotulo="Lucro">
               <span className={Number(venda.lucro) < 0 ? "text-vermelho" : "text-verde"}>{moeda(venda.lucro)}</span>
             </Linha>
+            {Number(venda.imposto) > 0 && (
+              <>
+                <Linha rotulo={`Imposto estimado (${percentual(venda.imposto_aliquota ?? 0)} da margem)`}>
+                  {moeda(venda.imposto)}
+                </Linha>
+                <Linha rotulo="Lucro líquido">
+                  <span className={Number(venda.lucro_liquido) < 0 ? "text-vermelho" : "text-verde"}>
+                    {moeda(venda.lucro_liquido)}
+                  </span>
+                </Linha>
+              </>
+            )}
           </>
         )}
         {venda.comissao && (
@@ -140,6 +153,7 @@ export default function Vendas() {
   const total = ativas.reduce((soma, v) => soma + Number(v.valor), 0);
   const verLucro = pode("custos.ver");
   const lucro = ativas.reduce((soma, v) => soma + Number(v.lucro ?? 0), 0);
+  const imposto = ativas.reduce((soma, v) => soma + Number(v.imposto ?? 0), 0);
 
   return (
     <>
@@ -168,6 +182,13 @@ export default function Vendas() {
                 <>
                   {" "}
                   · lucro <b className={lucro < 0 ? "text-vermelho" : "text-verde"}>{moeda(lucro)}</b>
+                  {imposto > 0 && (
+                    <>
+                      {" "}
+                      · imposto estimado <b>{moeda(imposto)}</b> · líquido{" "}
+                      <b className={lucro - imposto < 0 ? "text-vermelho" : "text-verde"}>{moeda(lucro - imposto)}</b>
+                    </>
+                  )}
                 </>
               )}
             </p>

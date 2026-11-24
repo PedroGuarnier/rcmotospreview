@@ -19,6 +19,7 @@ from app.models import (
     AuditLog,
     Cliente,
     Comissao,
+    Configuracao,
     CustoVeiculo,
     FotoVeiculo,
     LaudoProcedencia,
@@ -37,6 +38,7 @@ ENTIDADES: dict[type, str] = {
     Comissao: "comissao",
     Aporte: "aporte",
     LaudoProcedencia: "laudo",
+    Configuracao: "configuracao",
 }
 
 # Campos de controle que não interessam ao histórico.
@@ -71,6 +73,8 @@ def _rotulo(obj: Any) -> str:
         return obj.descricao
     if isinstance(obj, LaudoProcedencia):
         return f"da placa {obj.placa}"
+    if isinstance(obj, Configuracao):
+        return "da loja"
     return f"nº {obj.id}"
 
 

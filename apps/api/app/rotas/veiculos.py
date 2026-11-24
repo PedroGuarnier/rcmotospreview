@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, object_session, selectinload
 
 from app import fotos, procedencia, schemas
 from app.db import obter_db
@@ -19,7 +19,12 @@ from app.models import (
     Venda,
 )
 from app.permissoes import P, exigir, pode
-from app.servicos import mudar_situacao, recalcular_venda_do_veiculo
+from app.servicos import (
+    aliquota_imposto,
+    calcular_imposto,
+    mudar_situacao,
+    recalcular_venda_do_veiculo,
+)
 from app.tempo import hoje
 
 router = APIRouter(prefix="/veiculos", tags=["estoque"])
@@ -85,6 +90,12 @@ def _detalhe(veiculo: Veiculo, usuario: Usuario) -> schemas.VeiculoDetalhe:
     )
     if com_custos:
         dados["custos"] = [schemas.CustoOut.model_validate(c) for c in veiculo.custos]
+        if veiculo.preco_venda is not None:
+            dados["imposto_previsto"] = calcular_imposto(
+                veiculo.preco_venda,
+                veiculo.valor_compra,
+                aliquota_imposto(object_session(veiculo)),
+            )
     venda = veiculo.venda_ativa
     # O vendedor só enxerga os dados da venda se ela for dele.
     if venda is not None and (pode(usuario, P.vendas_ver_todas) or venda.vendedor_id == usuario.id):
@@ -96,6 +107,8 @@ def _detalhe(veiculo: Veiculo, usuario: Usuario) -> schemas.VeiculoDetalhe:
             cliente=schemas.PessoaRef.model_validate(venda.cliente),
             vendedor=schemas.PessoaRef.model_validate(venda.vendedor),
             lucro=venda.lucro if com_custos else None,
+            imposto=venda.imposto if com_custos else None,
+            lucro_liquido=venda.lucro - venda.imposto if com_custos else None,
         )
     return schemas.VeiculoDetalhe(**dados)
 

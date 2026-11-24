@@ -58,7 +58,12 @@ def serializar(venda: Venda, usuario: Usuario) -> schemas.VendaOut:
     }
     if pode(usuario, P.custos_ver):
         dados.update(
-            valor_compra=venda.valor_compra, total_custos=venda.total_custos, lucro=venda.lucro
+            valor_compra=venda.valor_compra,
+            total_custos=venda.total_custos,
+            lucro=venda.lucro,
+            imposto_aliquota=venda.imposto_aliquota,
+            imposto=venda.imposto,
+            lucro_liquido=venda.lucro - venda.imposto,
         )
     if venda.comissao is not None and (pode(usuario, P.comissoes_ver_todas) or propria):
         c = venda.comissao

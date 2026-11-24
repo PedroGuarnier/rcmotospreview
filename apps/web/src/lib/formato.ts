@@ -108,6 +108,19 @@ export function valorParaApi(texto: string): string | null {
   return Number.isFinite(n) ? n.toFixed(2) : null;
 }
 
+/** "6.50" → "6,5%" */
+export function percentual(valor: string | number): string {
+  return `${Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+}
+
+/** Percentual digitado ("6,5") → "6.50" para a API; null se vazio, fora de 0–100 ou com mais de 2 casas. */
+export function percentualParaApi(texto: string): string | null {
+  const normal = texto.trim().replace(",", ".");
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(normal)) return null;
+  const n = Number(normal);
+  return n <= 100 ? n.toFixed(2) : null;
+}
+
 /** "14900.00" → "14.900,00" para preencher o campo */
 export function valorParaCampo(valor: string | number | null | undefined): string {
   if (valor === null || valor === undefined || valor === "") return "";

@@ -86,7 +86,7 @@ Plataforma sob medida para a RC Motos, loja de motos e carros no Piauí. Desenvo
 - Números de exemplo em telas/demos devem ser marcados como ilustrativos.
 
 ## Estado do código (atualizado em 10/11/2026)
-- Feito: itens 1 e 2 da ordem sugerida (base, auth/perfis, audit log, estoque, vendas, lucro, comissões, painel, aportes); o site público (item 6, sem a IA de atendimento); e a procedência pela placa (telas, semáforo, laudo no veículo), com o provedor de demonstração e o adaptador da **Consultar Placa** (`apps/api/app/consultarplaca.py`, testado só com a placa de teste `AAA0000`; falta a conta da loja com créditos). Próximo: assistente de IA.
+- Feito: itens 1 e 2 da ordem sugerida (base, auth/perfis, audit log, estoque, vendas, lucro, comissões, painel, aportes); o site público (item 6, sem a IA de atendimento); e a procedência pela placa (telas, semáforo, laudo no veículo), com o provedor de demonstração e o adaptador da **Consultar Placa** (`apps/api/app/consultarplaca.py`, testado só com a placa de teste `AAA0000`; falta a conta da loja com créditos). Também feito: imposto estimado sobre a margem (venda − compra) com alíquota configurada pelo dono em `/configuracoes` (tabela `configuracao`, linha única); a comissão segue sobre o lucro antes do imposto. Próximo: assistente de IA.
 - Site público = página inicial de `apps/web` (`src/components/site/`, conceito visual "O Farol"); sistema da equipe em `/login`. `index.html` na raiz é só a prévia antiga.
 - Dados da loja no site vêm de `LOJA_*` (nunca escrever telefone/endereço no código). O site não inventa número, depoimento nem taxa de juros.
 - Rotas `/publico/*` da API não têm login: só pode sair delas o que é público (sem custos, chassi, RENAVAM, comprador, placa completa em listagem).

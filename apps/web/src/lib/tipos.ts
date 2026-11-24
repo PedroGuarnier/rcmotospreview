@@ -30,7 +30,8 @@ export type Permissao =
   | "usuarios.gerir"
   | "aportes.ver"
   | "historico.ver"
-  | "historico.veiculo_ver";
+  | "historico.veiculo_ver"
+  | "configuracoes.editar";
 
 export interface Usuario {
   id: number;
@@ -94,6 +95,8 @@ export interface VeiculoDetalhe extends Veiculo {
   renavam: string | null;
   data_compra: string | null;
   observacoes: string | null;
+  /** imposto estimado se vender pelo preço anunciado (só com custos.ver) */
+  imposto_previsto: string | null;
   fotos: Foto[];
   custos: Custo[] | null;
   venda: {
@@ -104,6 +107,8 @@ export interface VeiculoDetalhe extends Veiculo {
     cliente: PessoaRef;
     vendedor: PessoaRef;
     lucro: string | null;
+    imposto: string | null;
+    lucro_liquido: string | null;
   } | null;
 }
 
@@ -144,7 +149,15 @@ export interface Venda {
   valor_compra: string | null;
   total_custos: string | null;
   lucro: string | null;
+  imposto_aliquota: string | null;
+  imposto: string | null;
+  lucro_liquido: string | null;
   comissao: ComissaoResumo | null;
+}
+
+export interface Configuracao {
+  /** % do imposto estimado sobre a margem (venda − compra); "0.00" = não calcula */
+  imposto_margem_aliquota: string;
 }
 
 export interface Comissao extends ComissaoResumo {
@@ -194,6 +207,9 @@ export interface NumerosPeriodo {
   vendas: number;
   faturamento: string;
   lucro: string;
+  /** estimado, sobre a margem de cada venda */
+  imposto: string;
+  lucro_liquido: string;
   ticket_medio: string | null;
 }
 

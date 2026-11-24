@@ -31,6 +31,7 @@ class P(enum.StrEnum):
     aportes_ver = "aportes.ver"
     historico_ver = "historico.ver"
     historico_veiculo_ver = "historico.veiculo_ver"
+    configuracoes_editar = "configuracoes.editar"  # alíquota de imposto (só o dono)
 
 
 MATRIZ: dict[Perfil, frozenset[P]] = {

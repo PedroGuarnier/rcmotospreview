@@ -10,6 +10,7 @@ const ENTIDADE: Record<string, string> = {
   comissao: "comissão",
   aporte: "aporte",
   laudo: "laudo de procedência",
+  configuracao: "configuração",
   usuario: "usuário",
   sessao: "",
 };
@@ -46,6 +47,9 @@ const CAMPO: Record<string, string> = {
   senha: "senha",
   status: "status",
   lucro: "lucro",
+  imposto: "imposto estimado",
+  imposto_aliquota: "alíquota do imposto (%)",
+  imposto_margem_aliquota: "alíquota do imposto sobre a margem (%)",
   total_custos: "total de custos",
   forma: "forma de pagamento",
   data_venda: "data da venda",
@@ -62,7 +66,7 @@ const CAMPO: Record<string, string> = {
 };
 
 const DINHEIRO = new Set([
-  "valor", "valor_compra", "preco_venda", "lucro", "total_custos", "entrada", "valor_parcela",
+  "valor", "valor_compra", "preco_venda", "lucro", "imposto", "total_custos", "entrada", "valor_parcela",
 ]);
 const OCULTOS = new Set([
   "veiculo_id", "cliente_id", "vendedor_id", "venda_id", "registrada_por_id", "registrado_por_id",

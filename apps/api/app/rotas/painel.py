@@ -27,12 +27,19 @@ router = APIRouter(prefix="/painel", tags=["painel"])
 ZERO = Decimal("0.00")
 
 
-def _numeros(vendas: int = 0, faturamento: Decimal = ZERO, lucro: Decimal = ZERO):
+def _numeros(
+    vendas: int = 0, faturamento: Decimal = ZERO, lucro: Decimal = ZERO, imposto: Decimal = ZERO
+):
     ticket = (
         (faturamento / vendas).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if vendas else None
     )
     return schemas.NumerosPeriodo(
-        vendas=vendas, faturamento=faturamento, lucro=lucro, ticket_medio=ticket
+        vendas=vendas,
+        faturamento=faturamento,
+        lucro=lucro,
+        imposto=imposto,
+        lucro_liquido=lucro - imposto,
+        ticket_medio=ticket,
     )
 
 
@@ -63,22 +70,24 @@ def painel(
             func.count(Venda.id),
             func.coalesce(func.sum(Venda.valor), 0),
             func.coalesce(func.sum(Venda.lucro), 0),
+            func.coalesce(func.sum(Venda.imposto), 0),
         )
         .join(Venda.veiculo)
         .where(Venda.status == StatusVenda.ativa, Venda.data_venda >= lista_meses[0])
         .group_by(mes_col, Veiculo.tipo)
     ).all()
-    por_mes: dict[tuple[str, TipoVeiculo], tuple[int, Decimal, Decimal]] = {
-        (m.strftime("%Y-%m"), tipo): (qtd, fat, lucro) for m, tipo, qtd, fat, lucro in linhas
+    por_mes: dict[tuple[str, TipoVeiculo], tuple[int, Decimal, Decimal, Decimal]] = {
+        (m.strftime("%Y-%m"), tipo): (qtd, fat, lucro, imposto)
+        for m, tipo, qtd, fat, lucro, imposto in linhas
     }
 
     def montar(mes: date) -> schemas.MesPainel:
         chave = mes.strftime("%Y-%m")
-        moto = por_mes.get((chave, TipoVeiculo.moto), (0, ZERO, ZERO))
-        carro = por_mes.get((chave, TipoVeiculo.carro), (0, ZERO, ZERO))
+        moto = por_mes.get((chave, TipoVeiculo.moto), (0, ZERO, ZERO, ZERO))
+        carro = por_mes.get((chave, TipoVeiculo.carro), (0, ZERO, ZERO, ZERO))
         return schemas.MesPainel(
             mes=chave,
-            total=_numeros(moto[0] + carro[0], moto[1] + carro[1], moto[2] + carro[2]),
+            total=_numeros(*(a + b for a, b in zip(moto, carro, strict=True))),
             moto=_numeros(*moto),
             carro=_numeros(*carro),
         )

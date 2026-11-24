@@ -15,9 +15,10 @@ pela placa. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`]
 | Baixa de venda em dois toques, lucro = venda − compra − custos | pronto |
 | Comissão pela regra de cada vendedor + relatório do mês | pronto |
 | Painel: faturamento e lucro do mês, ticket médio moto/carro, estoque, parados | pronto |
+| Imposto estimado sobre a margem de cada venda, com alíquota configurada pelo dono | pronto |
 | Aportes (gastos pessoais investidos na loja), visíveis só a quem o dono habilitar | pronto |
 | Site público: vitrine sincronizada com o estoque, WhatsApp por veículo, SEO local | pronto |
-| Procedência pela placa: tela de consulta, semáforo, laudo salvo no veículo | pronto, **sem provedor real ainda** (ver abaixo) |
+| Procedência pela placa: tela de consulta, semáforo, laudo salvo no veículo | pronto; provedor Consultar Placa integrado, falta a conta da loja com créditos (ver abaixo) |
 | Assistente de IA | a fazer (próximo passo) |
 | Asaas, cobrança, WhatsApp/Instagram com IA, linha do veículo, voz | a fazer |
 
@@ -175,7 +176,7 @@ interface recebe a lista pronta em `/auth/eu` (não há regra duplicada no front
 
 | Perfil | Pode |
 |---|---|
-| dono | tudo: equipe, aportes, histórico geral, excluir veículo |
+| dono | tudo: equipe, aportes, histórico geral, excluir veículo, alíquota do imposto |
 | gerente | estoque (editar, custos, fotos), vendas (registrar e cancelar), painel, comissões (ver) |
 | financeiro | vendas e clientes (ver), comissões (ver e marcar como paga) |
 | vendedor | ver estoque **sem** valor de compra/custos/lucro, registrar venda no próprio nome, ver as próprias vendas e comissões |
@@ -187,6 +188,12 @@ Aportes: só o dono e quem ele marcar em **Equipe → Pode ver os aportes**.
 ## Regras de negócio que valem saber
 
 - **Lucro** = valor da venda − valor de compra − custos lançados no veículo.
+- **Imposto estimado** = alíquota × margem, onde margem = valor da venda − valor de compra (os
+  custos não entram; margem negativa não gera imposto). A alíquota é uma só, informada pelo dono
+  em **Configurações** com o número do contador; começa em 0, que desliga o cálculo. Cada venda
+  guarda a alíquota do dia da baixa: mudar a alíquota não altera vendas já registradas. O imposto
+  não entra no lucro (base da comissão); aparece à parte, com o **lucro líquido** = lucro − imposto,
+  nas vendas, no veículo e no painel. É estimativa: o valor a pagar é o apurado pelo contador.
 - **Comissão**: cada usuário tem uma regra (% do lucro, % da venda ou valor fixo). A venda guarda
   um retrato da regra; mudar a regra depois não altera vendas antigas. Venda com prejuízo não
   gera comissão negativa.

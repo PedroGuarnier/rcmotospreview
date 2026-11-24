@@ -12,6 +12,7 @@ from app.rotas import (
     auth,
     clientes,
     comissoes,
+    configuracoes,
     historico,
     painel,
     procedencia,
@@ -43,6 +44,7 @@ for modulo in (
     aportes,
     historico,
     procedencia,
+    configuracoes,
     publico,
 ):
     app.include_router(modulo.router)

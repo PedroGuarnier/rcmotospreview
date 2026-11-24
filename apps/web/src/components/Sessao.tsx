@@ -65,6 +65,13 @@ const ICONES = {
       <path d="M12 7v5l3.5 2" />
     </>
   ),
+  configuracoes: (
+    <>
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </>
+  ),
   conta: (
     <>
       <circle cx="12" cy="8" r="4" />
@@ -108,6 +115,7 @@ const MENU: ItemMenu[] = [
   { href: "/aportes", rotulo: "Aportes", icone: "aportes", permissao: "aportes.ver" },
   { href: "/usuarios", rotulo: "Equipe", icone: "equipe", permissao: "usuarios.gerir" },
   { href: "/historico", rotulo: "Histórico", icone: "historico", permissao: "historico.ver" },
+  { href: "/configuracoes", rotulo: "Configurações", icone: "configuracoes", permissao: "configuracoes.editar" },
   { href: "/conta", rotulo: "Minha conta", icone: "conta" },
 ];
 
