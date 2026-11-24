@@ -17,9 +17,10 @@ pela placa. Escopo completo, prazos e regras do contrato estão em [`CLAUDE.md`]
 | Painel: faturamento e lucro do mês, ticket médio moto/carro, estoque, parados | pronto |
 | Imposto estimado sobre a margem de cada venda, com alíquota configurada pelo dono | pronto |
 | Aportes (gastos pessoais investidos na loja), visíveis só a quem o dono habilitar | pronto |
-| Site público: vitrine sincronizada com o estoque, WhatsApp por veículo, SEO local | pronto |
+| Site público: vitrine sincronizada com o estoque, página por veículo, WhatsApp por veículo, SEO local | pronto |
 | Procedência pela placa: tela de consulta, semáforo, laudo salvo no veículo | pronto; provedor Consultar Placa integrado, falta a conta da loja com créditos (ver abaixo) |
-| Assistente de IA | a fazer (próximo passo) |
+| Assistente de cadastro: veículo novo por mensagem, com confirmação (motor de regras, sem IA) | pronto |
+| Assistente de IA: perguntas sobre vendas, estoque e financeiro; venda por mensagem | a fazer (próximo passo) |
 | Asaas, cobrança, WhatsApp/Instagram com IA, linha do veículo, voz | a fazer |
 
 O `index.html` na raiz é a prévia antiga do site mostrada ao cliente; o site de verdade é a
@@ -29,9 +30,18 @@ página inicial de `apps/web`.
 
 A página inicial (`/`) é o site da loja; o sistema da equipe fica em `/login`.
 
-- **Vitrine**: mostra exatamente o que está "à venda" no sistema, com preço, fotos e botão de
-  WhatsApp com mensagem pronta. Vendeu ou mudou de etapa, sai do site na hora.
-- **Procedência**: o visitante digita a placa (ou toca em "Ver procedência" num anúncio) e vê o
+O site é a vitrine da loja: os produtos vêm primeiro, a procedência é um apoio.
+
+- **Primeira dobra**: os veículos que chegaram por último já aparecem ao lado do título, com
+  atalhos para motos e carros.
+- **Vitrine**: mostra exatamente o que está "à venda" no sistema, em grade, com preço, fotos,
+  filtro por tipo, busca e ordenação. Vendeu ou mudou de etapa, sai do site na hora. Veículo
+  sem foto aparece com um cartão só com o nome do modelo.
+- **Página do veículo** (`/veiculo/ID-marca-modelo-ano`): galeria, ficha, botão de WhatsApp com
+  mensagem pronta, laudo de procedência e outros veículos da vitrine. Cada página tem título,
+  descrição e dados estruturados próprios para o Google (os dados estruturados não saem com
+  dados de demonstração).
+- **Procedência**: o visitante digita a placa (ou abre o laudo na página do veículo) e vê o
   laudo guardado daquele veículo. Só vale para veículo à venda na loja — o site não faz consulta
   paga de placa de terceiros.
 - **Proposta**: monta a mensagem de WhatsApp (veículo, forma de pagamento, entrada, parcelas,
@@ -41,6 +51,27 @@ A página inicial (`/`) é o site da loja; o sistema da equipe fica em `/login`.
   ele os botões abrem o WhatsApp sem destinatário.
 - A placa completa não é publicada (só `ABC•••1`), para não facilitar clonagem. Quem digita a
   placa inteira, porque viu o veículo, consegue o laudo.
+
+## Assistente de cadastro
+
+Na área da equipe, **Assistente** (logo abaixo de Estoque no menu) cadastra veículo novo por
+mensagem. Quem pode usar é quem pode cadastrar pelo formulário (permissão `estoque.editar`).
+
+- Escreva como fala, em qualquer ordem: `chegou uma Honda CG 160 Fan 2022 vermelha, placa
+  ABC1D23, 18.500 km, comprei por 11.500 e vou vender por 14.900`. A ficha vai sendo montada ao
+  lado da conversa.
+- Obrigatórios: marca e modelo, tipo (moto ou carro) e valor de compra. O que faltar, ele
+  pergunta, uma coisa de cada vez. Número sem pista ou valor em escala duvidosa vira pergunta,
+  nunca chute.
+- Nada é gravado antes da confirmação ("sim" ou o botão). Dá para corrigir ("a cor é preta"),
+  tirar um campo ou cancelar.
+- O veículo entra na etapa **Compra**. Para já sair no site, diga "já está à venda" e informe o
+  preço de venda.
+- Placa ou chassi que já existe no sistema é avisado antes de gravar.
+- É um motor de regras (`apps/api/app/assistente.py`): não usa IA nem serviço externo e não tem
+  custo por mensagem. A função `interpretar()` é a única parte que um modelo de linguagem
+  substituiria. Perguntas sobre vendas, estoque e financeiro ainda não são respondidas aqui:
+  isso é o assistente de IA do contrato, que continua a fazer.
 
 ## Procedência pela placa
 
