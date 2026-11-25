@@ -53,13 +53,13 @@ export function Pagamento({
   const mensagem = linhas.join("\n");
 
   return (
-    <section id="pagamento" className="solar" aria-labelledby="titulo-pagamento">
-      <div className="solar__grade">
+    <section id="pagamento" className="pagar" aria-labelledby="titulo-pagamento">
+      <div className="pagar__grade">
         <div>
           <p className="sobretitulo" data-revelar>
             <Barras /> Como pagar
           </p>
-          <h2 id="titulo-pagamento" className="outdoor solar__titulo" data-revelar>
+          <h2 id="titulo-pagamento" className="outdoor pagar__titulo" data-revelar>
             Do jeito que cabe.
           </h2>
           <ol className="jeitos">

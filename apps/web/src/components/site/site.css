@@ -25,7 +25,7 @@
   outline-offset: 3px;
 }
 .site .claro :focus-visible,
-.site .solar :focus-visible {
+.site .pagar :focus-visible {
   outline-color: var(--azul);
 }
 /* destinos de âncora recebem o foco sem ganhar contorno */
@@ -173,7 +173,7 @@
   color: #fff;
 }
 .claro .acao--linha:hover,
-.solar .acao--linha:hover {
+.pagar .acao--linha:hover {
   background: var(--tinta);
   border-color: var(--tinta);
   color: #fff;
@@ -380,7 +380,10 @@
 }
 .ficha span {
   position: relative;
+  max-width: 100%;
+  overflow: hidden;
   padding-left: var(--ponto);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ficha span::before {
@@ -425,7 +428,8 @@
   object-fit: cover;
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* sem foto ainda: pôster tipográfico no azul da marca. Tudo escala pela largura do pôster (cqw). */
+/* sem foto ainda: pôster tipográfico no azul da marca. Tudo escala pela caixa do pôster: pela
+   largura (cqw) e, nas caixas baixas, pela altura (cqh), para o texto nunca passar da borda. */
 .poster {
   position: absolute;
   inset: 0;
@@ -433,18 +437,19 @@
   flex-direction: column;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: clamp(0.85rem, 6cqw, 2.25rem);
+  padding: clamp(0.7rem, min(6cqw, 10cqh), 2.25rem);
   background: linear-gradient(155deg, #1a14cf 0%, #140fa6 48%, #0d0a73 100%);
   color: #fff;
   overflow: hidden;
 }
 .poster .barras {
+  --barra: clamp(3px, min(1.5cqw, 2.6cqh), 8px);
   align-self: flex-end;
-  gap: clamp(3px, 1.5cqw, 8px);
+  gap: var(--barra);
   color: var(--amarelo);
 }
 .poster .barras i {
-  height: clamp(3px, 1.5cqw, 8px);
+  height: var(--barra);
   border-radius: 99px;
 }
 .poster .barras i:nth-child(1) {
@@ -459,21 +464,34 @@
 .poster__base {
   display: grid;
   justify-items: start;
-  gap: clamp(0.3rem, 1.8cqw, 0.7rem);
+  gap: clamp(0.25rem, min(1.8cqw, 2.4cqh), 0.7rem);
+  min-width: 0;
 }
 .poster__marca {
+  max-width: 100%;
+  overflow: hidden;
   font-family: var(--font-dado);
   font-weight: 700;
-  font-size: clamp(0.66rem, 3.3cqw, 1rem);
+  font-size: clamp(0.62rem, min(3.3cqw, 6cqh), 1rem);
   letter-spacing: 0.22em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--amarelo);
-  overflow-wrap: anywhere;
 }
 .poster__modelo {
+  /* nome curto enche o pôster numa linha; nome longo diminui até um piso e quebra em duas.
+     --teto (em cqh) segura a altura: maior para uma linha, menor para duas. */
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-family: var(--font-display);
-  /* nome curto enche o pôster numa linha; nome longo diminui até um piso e quebra em duas */
-  font-size: clamp(1.45rem, max(9cqw, min(25cqw, calc(172cqw / var(--letras)))), 7rem);
+  font-size: clamp(
+    1rem,
+    min(max(9cqw, min(25cqw, calc(172cqw / var(--letras)))), calc(var(--teto) * 1cqh)),
+    7rem
+  );
   line-height: 1.14;
   text-transform: uppercase;
   text-wrap: balance;
@@ -483,12 +501,13 @@
   display: flex;
   align-items: center;
   gap: 0.6em;
-  margin-top: clamp(0.1rem, 0.8cqw, 0.4rem);
+  margin-top: clamp(0rem, 0.8cqw, 0.4rem);
   font-family: var(--font-dado);
   font-weight: 700;
   font-size: clamp(0.6rem, 2.5cqw, 0.76rem);
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--nevoa);
 }
 .poster__aviso::before {
@@ -497,11 +516,14 @@
   height: 2px;
   background: currentColor;
 }
-/* pôster em miniatura (destaques compactos do celular): só as barras, a marca e o modelo */
-@container (max-width: 11rem) {
-  .poster {
-    padding: 0.7rem 0.8rem;
+/* pôster estreito: a etiqueta "Chegou esta semana" não cabe ao lado das barras */
+@container (max-width: 15rem) {
+  .poster + .etiqueta {
+    display: none;
   }
+}
+/* pôster em miniatura (destaques compactos do celular): só as barras, a marca e o modelo */
+@container (max-width: 11rem) or (max-height: 8.5rem) {
   .poster__aviso {
     display: none;
   }
@@ -623,6 +645,10 @@
   font-size: 0.72rem;
   color: var(--nevoa);
 }
+.dobra__rotulo span,
+.dobra__rotulo a {
+  white-space: nowrap;
+}
 .dobra__rotulo a {
   padding: 0.35rem 0;
   color: #fff;
@@ -657,7 +683,7 @@
   display: block;
   overflow: hidden;
   background: var(--tinta);
-  container-type: inline-size;
+  container-type: size;
 }
 .destaque__midia .etiqueta,
 .cartao__midia .etiqueta {
@@ -676,8 +702,10 @@
 }
 .destaque__texto {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.4rem;
   min-width: 0;
+  max-width: 100%;
 }
 .destaque__nome {
   display: -webkit-box;
@@ -695,16 +723,29 @@
 .dobra__marca {
   display: none;
 }
-.dobra__onde i {
-  font-style: normal;
+/* "o que · onde": como na ficha, o ponto separa os dois mas nunca sobra no fim nem no começo
+   de uma linha quando o texto quebra */
+.dobra__onde {
+  --ponto: 1.5em;
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
+  margin-left: calc(var(--ponto) * -1);
+  clip-path: inset(0 0 0 var(--ponto));
+}
+.dobra__onde span {
+  position: relative;
+  padding-left: var(--ponto);
+}
+.dobra__onde span::before {
+  content: "·";
+  position: absolute;
+  left: 0;
+  width: var(--ponto);
+  text-align: center;
 }
 @media (max-width: 639px) {
   /* celular: tudo mais junto, para o primeiro produto aparecer sem rolar */
-  .dobra__onde {
-    display: grid;
-    gap: 0.3rem;
-  }
-  .dobra__onde i,
   .dobra__conta {
     display: none;
   }
@@ -719,9 +760,26 @@
     padding-inline: 0.5rem;
     font-size: clamp(0.9rem, 4.1vw, 1.12rem);
   }
-  /* o primeiro destaque em cartão cheio; os outros dois em linhas compactas */
+  .dobra__grade {
+    gap: 1.35rem;
+  }
+  .dobra__apoio {
+    margin-top: 0.85rem;
+  }
+  .dobra__acoes,
+  .dobra__fatos {
+    margin-top: 1.1rem;
+  }
+  /* o primeiro destaque em cartão cheio, com o preço ao lado do nome quando cabe;
+     os outros dois em linhas compactas */
   .destaque:first-child .destaque__midia {
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 16 / 9;
+  }
+  .destaque:first-child .destaque__corpo {
+    flex-flow: row wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.35rem 1rem;
   }
   .destaque:first-child .destaque__nome {
     font-size: 1.75rem;
@@ -788,6 +846,9 @@
   }
   .destaques[data-total="1"] {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .destaques[data-total="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .destaque {
     grid-template-rows: minmax(0, 1fr) auto;
@@ -1045,7 +1106,7 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   background: var(--tinta);
-  container-type: inline-size;
+  container-type: size;
 }
 .cartao__conta {
   position: absolute;
@@ -1153,17 +1214,17 @@
 }
 
 /* ---------- 3. Como pagar ---------- */
-.solar {
+.pagar {
   position: relative;
   padding: clamp(3.5rem, 8vw, 6.5rem) var(--margem);
   background: var(--amarelo);
   color: var(--tinta);
 }
-.solar__grade {
+.pagar__grade {
   display: grid;
   gap: clamp(2.5rem, 6vw, 5rem);
 }
-.solar__titulo {
+.pagar__titulo {
   margin-top: 0.9rem;
   font-size: clamp(3rem, 7vw, 6.5rem);
   line-height: 0.93;
@@ -1362,7 +1423,7 @@
   width: 100%;
 }
 @media (min-width: 1000px) {
-  .solar__grade {
+  .pagar__grade {
     grid-template-columns: minmax(0, 1fr) minmax(0, 30rem);
     align-items: start;
   }
@@ -1723,7 +1784,7 @@
   overflow: hidden;
   border-radius: 12px;
   background: var(--tinta);
-  container-type: inline-size;
+  container-type: size;
 }
 button.produto__principal {
   cursor: zoom-in;
@@ -1956,7 +2017,7 @@ button.produto__principal {
   z-index: 70;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: rgb(5 5 42 / 0.97);
+  background: #05052a; /* opaco: nada da página aparece por trás da foto */
   color: #fff;
   padding: 1rem var(--margem) 1.5rem;
 }

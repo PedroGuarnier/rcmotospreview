@@ -61,10 +61,12 @@ export function Capa({ veiculo, urgente = false }: { veiculo: VeiculoPublico; ur
       />
     );
   }
-  // o tamanho da letra acompanha o comprimento do modelo: nome curto enche o pôster, nome longo cabe
+  // o tamanho da letra acompanha o comprimento do modelo: nome curto enche o pôster numa linha,
+  // nome longo vai para duas — e o teto de altura (em % da caixa) é menor quando são duas
   const letras = Math.max(veiculo.modelo.length, 6);
+  const teto = letras <= 19 ? 34 : 18;
   return (
-    <span className="poster" style={{ "--letras": letras } as React.CSSProperties} aria-hidden>
+    <span className="poster" style={{ "--letras": letras, "--teto": teto } as React.CSSProperties} aria-hidden>
       <Barras />
       <span className="poster__base">
         <span className="poster__marca">{veiculo.marca}</span>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { VeiculoPublico } from "@/lib/tipos";
 import { nomeVeiculo } from "./anuncio";
+import { useFocoPreso } from "./foco";
 
-/** Fotos em tela cheia: setas do teclado passam, Esc fecha e o foco volta para onde estava. */
+/** Fotos em tela cheia: setas do teclado passam, Esc fecha, o Tab não sai dela e o foco volta para onde estava. */
 export function Galeria({
   veiculo,
   inicial = 0,
@@ -17,21 +18,17 @@ export function Galeria({
 }) {
   const [i, setI] = useState(inicial);
   const total = veiculo.fotos.length;
+  const caixa = useRef<HTMLDivElement>(null);
+  useFocoPreso(caixa);
 
-  // quem abriu a galeria (lido antes de o botão de fechar puxar o foco)
-  const [abriu] = useState(() =>
-    typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null),
-  );
-
-  // enquanto está aberta a página não rola por baixo; ao fechar, o foco volta para quem abriu
+  // enquanto está aberta a página não rola por baixo
   useEffect(() => {
     const anterior = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = anterior;
-      abriu?.focus({ preventScroll: true });
     };
-  }, [abriu]);
+  }, []);
 
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
@@ -44,10 +41,16 @@ export function Galeria({
   }, [aoFechar, total]);
 
   return (
-    <div className="galeria" role="dialog" aria-modal="true" aria-label={`Fotos: ${nomeVeiculo(veiculo)}`}>
+    <div
+      ref={caixa}
+      className="galeria"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Fotos: ${nomeVeiculo(veiculo)}`}
+    >
       <div className="galeria__barra">
         <p className="outdoor galeria__nome">{nomeVeiculo(veiculo)}</p>
-        <button type="button" className="botao-redondo" onClick={aoFechar} aria-label="Fechar fotos" autoFocus>
+        <button type="button" className="botao-redondo" onClick={aoFechar} aria-label="Fechar fotos">
           ✕
         </button>
       </div>
@@ -65,7 +68,7 @@ export function Galeria({
         >
           ←
         </button>
-        <span className="dado galeria__conta">
+        <span className="dado galeria__conta" aria-live="polite">
           {i + 1} / {total}
         </span>
         <button

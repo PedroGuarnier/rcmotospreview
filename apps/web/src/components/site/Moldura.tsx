@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type Loja, linkWhats } from "@/lib/loja";
+import { useFocoPreso } from "./foco";
 import { Barras, IconeZap } from "./pecas";
 import "./site.css";
 
@@ -32,6 +33,44 @@ function Secao({
   );
 }
 
+/** Menu do celular, em tela cheia: Esc fecha, o Tab não sai dele e a página não rola por baixo. */
+function Gaveta({ inicio, linkLoja, aoFechar }: { inicio: boolean; linkLoja: string; aoFechar: () => void }) {
+  const caixa = useRef<HTMLDivElement>(null);
+  useFocoPreso(caixa);
+
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => e.key === "Escape" && aoFechar();
+    document.addEventListener("keydown", tecla);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", tecla);
+      document.body.style.overflow = "";
+    };
+  }, [aoFechar]);
+
+  return (
+    <div ref={caixa} id="gaveta" className="gaveta" role="dialog" aria-modal="true" aria-label="Menu">
+      <div className="gaveta__topo">
+        <span className="topo__marca">RC Motos</span>
+        <button type="button" className="botao-redondo" onClick={aoFechar} aria-label="Fechar menu">
+          ✕
+        </button>
+      </div>
+      <nav className="gaveta__links" aria-label="Seções do site">
+        {SECOES.map((s, i) => (
+          <Secao key={s.id} id={s.id} inicio={inicio} onClick={aoFechar} style={{ "--i": i } as React.CSSProperties}>
+            <span>0{i + 1}</span>
+            {s.rotulo}
+          </Secao>
+        ))}
+      </nav>
+      <a className="acao acao--tinta" href={linkLoja} target="_blank" rel="noopener">
+        Chamar no WhatsApp
+      </a>
+    </div>
+  );
+}
+
 /**
  * O que toda página do site tem em volta: cabeçalho fixo, menu do celular, rodapé e o botão
  * flutuante do WhatsApp.
@@ -53,6 +92,7 @@ export function Moldura({
   const [rolou, setRolou] = useState(false);
   const [gaveta, setGaveta] = useState(false);
   const [zapOculto, setZapOculto] = useState(true);
+  const fecharGaveta = useCallback(() => setGaveta(false), []);
 
   const linkLoja = linkWhats(loja.whatsapp, "Olá! Vim pelo site da RC Motos.");
   const local = loja.cidade ? `${loja.cidade}, Piauí` : "Piauí";
@@ -78,16 +118,22 @@ export function Moldura({
     rolar();
     window.addEventListener("scroll", rolar, { passive: true });
 
-    // o botão flutuante some onde já existe uma ação de WhatsApp na tela (e no rodapé)
+    // O botão flutuante some onde já existe uma ação de WhatsApp na tela (e no rodapé). E só
+    // aparece depois que a pessoa passou pela primeira delas: antes, ele só cobriria conteúdo.
     const comZap = new Set<Element>();
+    const alvosZap = el.querySelectorAll("[data-sem-zap]");
+    let antesDaPrimeira = false;
     const vigia = new IntersectionObserver((entradas) => {
       for (const entrada of entradas) {
         if (entrada.isIntersecting) comZap.add(entrada.target);
         else comZap.delete(entrada.target);
+        if (entrada.target === alvosZap[0]) {
+          antesDaPrimeira = !entrada.isIntersecting && entrada.boundingClientRect.top > 0;
+        }
       }
-      setZapOculto(comZap.size > 0);
+      setZapOculto(comZap.size > 0 || antesDaPrimeira);
     });
-    el.querySelectorAll("[data-sem-zap]").forEach((alvo) => vigia.observe(alvo));
+    alvosZap.forEach((alvo) => vigia.observe(alvo));
 
     // Âncoras da própria página deslizam até a seção. Fica aqui, e não em `scroll-behavior` no
     // <html>, para a troca de página e o "voltar" do navegador continuarem instantâneos.
@@ -122,18 +168,6 @@ export function Moldura({
       window.clearTimeout(semAncora);
     };
   }, []);
-
-  // menu do celular: Esc fecha e a página não rola por baixo
-  useEffect(() => {
-    if (!gaveta) return;
-    const tecla = (e: KeyboardEvent) => e.key === "Escape" && setGaveta(false);
-    document.addEventListener("keydown", tecla);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", tecla);
-      document.body.style.overflow = "";
-    };
-  }, [gaveta]);
 
   const marca = (
     <>
@@ -181,39 +215,7 @@ export function Moldura({
         </button>
       </header>
 
-      {gaveta && (
-        <div id="gaveta" className="gaveta" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="gaveta__topo">
-            <span className="topo__marca">RC Motos</span>
-            <button
-              type="button"
-              className="botao-redondo"
-              onClick={() => setGaveta(false)}
-              aria-label="Fechar menu"
-              autoFocus
-            >
-              ✕
-            </button>
-          </div>
-          <nav className="gaveta__links" aria-label="Seções do site">
-            {SECOES.map((s, i) => (
-              <Secao
-                key={s.id}
-                id={s.id}
-                inicio={inicio}
-                onClick={() => setGaveta(false)}
-                style={{ "--i": i } as React.CSSProperties}
-              >
-                <span>0{i + 1}</span>
-                {s.rotulo}
-              </Secao>
-            ))}
-          </nav>
-          <a className="acao acao--tinta" href={linkLoja} target="_blank" rel="noopener">
-            Chamar no WhatsApp
-          </a>
-        </div>
-      )}
+      {gaveta && <Gaveta inicio={inicio} linkLoja={linkLoja} aoFechar={fecharGaveta} />}
 
       <main id="conteudo" tabIndex={-1}>
         {children}

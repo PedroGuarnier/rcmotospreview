@@ -63,7 +63,7 @@ export function Dobra({
           <p className="sobretitulo">
             <Barras />
             <span className="dobra__onde">
-              <span>Motos e carros seminovos</span> <i aria-hidden>·</i> <span>{local}</span>
+              <span>Motos e carros seminovos</span> <span>{local}</span>
             </span>
           </p>
           <h1 id="titulo-site" className="outdoor dobra__titulo">
