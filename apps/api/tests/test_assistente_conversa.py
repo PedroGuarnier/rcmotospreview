@@ -191,7 +191,7 @@ def test_remocao(dono):
     assert "cor" not in ficha(r)
     assert nomes(r["sugeridos"]) == ["placa", "preco_venda"] and r["acao"] == "confirmar"
     r = conversa.dizer("tira a cor")
-    assert "já estava vazio" in r["resposta"]
+    assert "a ficha fica sem cor" in r["resposta"]
     r = conversa.dizer("tira o valor de compra")  # obrigatório: volta a perguntar
     assert r["estado"]["aguardando"] == "valor_compra" and r["pronto"] is False
 
@@ -324,7 +324,7 @@ def test_numero_sem_pista_vira_pergunta(dono):
 def test_preco_abaixo_da_compra_avisa(dono):
     r = Conversa(dono).dizer("biz 125 comprei por 9 mil vendo por 8 mil")
     assert "O preço de venda está abaixo do valor de compra." in r["avisos"]
-    assert ficha(r)["lucro_previsto"] == "R$ -1.000,00"
+    assert ficha(r)["lucro_previsto"] == "-R$ 1.000,00"
 
 
 def test_ajuda_e_fora_do_escopo_nao_perdem_o_rascunho(dono, db):
@@ -439,3 +439,44 @@ def test_rota_de_cadastro_continua_igual(dono, db):
     assert (v["placa"], v["renavam"], v["situacao"]) == ("ABC1D23", "00123456789", "a_venda")
     evento = db.scalar(select(AuditLog).where(AuditLog.entidade == "veiculo"))
     assert (evento.acao, evento.usuario_nome, evento.veiculo_id) == ("criou", "Dono", v["id"])
+
+
+def test_dois_veiculos_na_mesma_mensagem_nao_misturam(dono, db):
+    conversa = Conversa(dono)
+    r = conversa.dizer("troquei um gol 2010 numa biz 2020")
+    assert (
+        "mais de um veículo" in r["resposta"] and "Gol" in r["resposta"] and "Biz" in r["resposta"]
+    )
+    assert r["acao"] == "nenhuma" and r["ficha"] == []
+    assert total_de_veiculos(db) == 0
+
+
+def test_versao_escrita_depois_da_cor_entra_no_modelo(dono):
+    r = Conversa(dono).dizer("strada 2018 branca cabine simples 80 mil km paguei 55 mil")
+    campos = ficha(r)
+    assert (campos["marca"], campos["modelo"]) == ("Fiat", "Strada Cabine Simples")
+    assert (campos["cor"], campos["km"]) == ("Branca", "80.000 km")
+
+
+def test_caracteres_de_controle_nao_chegam_ao_banco(dono, db):
+    """NUL e companhia derrubariam a gravação no Postgres: são tirados na entrada."""
+    conversa = Conversa(dono)
+    conversa.dizer("biz 125 2021 branca\u0000 comprei por 9 mil")
+    conversa.dizer("obs: revisada \u0007 na oficina")
+    r = conversa.dizer("sim")
+    assert r["acao"] == "criado"
+    veiculo = db.scalar(select(Veiculo))
+    assert (veiculo.modelo, veiculo.cor) == ("Biz 125", "Branca")
+    assert veiculo.observacoes is not None
+    assert not any(ord(c) < 32 for c in veiculo.observacoes)
+    # estado devolvido pelo navegador passa pelo mesmo filtro
+    estado = {"rascunho": {"marca": "Hon\u0000da", "modelo": "Biz"}, "aguardando": None}
+    r = dono.post("/assistente/mensagem", json={"mensagem": "ajuda", "estado": estado})
+    assert r.status_code == 200 and r.json()["estado"]["rascunho"]["marca"] == "Honda"
+
+
+def test_valores_fora_da_faixa_viram_aviso_e_nao_erro(dono):
+    conversa = Conversa(dono)
+    r = conversa.dizer("biz 125 km 99999999 comprei por 9 mil vendo por 0")
+    assert "km" not in ficha(r) and "preco_venda" not in ficha(r)
+    assert "maior que zero" in r["resposta"] and "quilometragem demais" in r["resposta"]

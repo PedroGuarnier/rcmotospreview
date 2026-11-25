@@ -51,12 +51,29 @@ function ler(chave: string): Conversa {
   try {
     const bruto = window.sessionStorage.getItem(chave);
     const lida: unknown = bruto ? JSON.parse(bruto) : null;
-    if (valida(lida)) conversa = lida;
+    if (valida(lida)) conversa = semResposta(lida);
   } catch {
     // sem sessionStorage (bloqueado, modo privado) ou conteúdo estragado: começa vazia
   }
   memoria.set(chave, conversa);
   return conversa;
+}
+
+/**
+ * A página foi recarregada com uma mensagem a caminho: a resposta se perdeu, mas o servidor
+ * pode ter atendido (e gravado o veículo, se era a confirmação).
+ */
+function semResposta(conversa: Conversa): Conversa {
+  const ultima = conversa.mensagens.at(-1);
+  if (ultima?.de !== "voce") return conversa;
+  const aviso: Mensagem = {
+    id: ultima.id + 1,
+    de: "sistema",
+    texto:
+      "A página foi recarregada antes de a resposta chegar. Se você estava confirmando o cadastro, " +
+      "veja no Estoque se o veículo entrou; se não, mande a mensagem de novo.",
+  };
+  return { ...conversa, mensagens: [...conversa.mensagens, aviso] };
 }
 
 function gravar(chave: string, conversa: Conversa) {

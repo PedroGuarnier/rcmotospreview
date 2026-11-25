@@ -1,10 +1,12 @@
+import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     EmailStr,
     Field,
@@ -555,16 +557,31 @@ class ProcedenciaPublica(BaseModel):
 # ---------- Assistente (cadastro de veículo por mensagem) ----------
 
 
+def _so_texto(valor: Any) -> Any:
+    """Tira o que o banco recusa dentro de um texto (NUL, outros caracteres de controle e
+    metade de emoji) e os espaços das pontas. A mensagem e o estado vêm do navegador e viram
+    dado do veículo."""
+    if not isinstance(valor, str):
+        return valor
+    limpo = (c for c in valor if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cs"))
+    return "".join(limpo).strip()
+
+
+TextoDoAssistente = Annotated[
+    str | None, BeforeValidator(_so_texto), AfterValidator(_vazio_para_none(str.strip))
+]
+
+
 class AssistenteRascunho(BaseModel):
     """O que o assistente já entendeu: os campos do cadastro, com os mesmos limites, todos
     opcionais. Volta do navegador a cada mensagem, então os textos têm o tamanho das colunas."""
 
     tipo: TipoVeiculo | None = None
-    marca: TextoOpcional = Field(None, max_length=60)
-    modelo: TextoOpcional = Field(None, max_length=120)
+    marca: TextoDoAssistente = Field(None, max_length=60)
+    modelo: TextoDoAssistente = Field(None, max_length=120)
     ano_fabricacao: int | None = Field(None, ge=1950, le=2100)
     ano_modelo: int | None = Field(None, ge=1950, le=2100)
-    cor: TextoOpcional = Field(None, max_length=40)
+    cor: TextoDoAssistente = Field(None, max_length=40)
     km: int | None = Field(None, ge=0, le=9_999_999)
     placa: Placa = None
     chassi: Chassi = None
@@ -572,7 +589,7 @@ class AssistenteRascunho(BaseModel):
     valor_compra: Valor | None = None
     preco_venda: ValorPositivo | None = None
     situacao: Situacao | None = None
-    observacoes: TextoOpcional = None
+    observacoes: TextoDoAssistente = Field(None, max_length=1000)  # cabe numa mensagem
 
 
 class AssistenteEstado(BaseModel):
@@ -596,9 +613,7 @@ class AssistenteEstado(BaseModel):
 
 
 class AssistenteMensagem(BaseModel):
-    mensagem: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)
-    ]
+    mensagem: Annotated[str, BeforeValidator(_so_texto), Field(min_length=1, max_length=1000)]
     estado: AssistenteEstado | None = None
 
 

@@ -68,6 +68,8 @@ mensagem. Quem pode usar é quem pode cadastrar pelo formulário (permissão `es
 - O veículo entra na etapa **Compra**. Para já sair no site, diga "já está à venda" e informe o
   preço de venda.
 - Placa ou chassi que já existe no sistema é avisado antes de gravar.
+- Um veículo por conversa: se a mensagem citar dois ("troquei um Gol numa Biz"), ele avisa e
+  pede os dados de um só, em vez de misturar.
 - É um motor de regras (`apps/api/app/assistente.py`): não usa IA nem serviço externo e não tem
   custo por mensagem. A função `interpretar()` é a única parte que um modelo de linguagem
   substituiria. Perguntas sobre vendas, estoque e financeiro ainda não são respondidas aqui:

@@ -141,8 +141,8 @@ _CATALOGO: tuple[tuple[str, str, str], ...] = (
     (
         "carro",
         "Toyota",
-        "Corolla, Corolla Cross, Hilux, Etios, Yaris, SW4, RAV4, Camry, Prius, Bandeirante, "
-        "Fielder",
+        "Corolla, Corolla Cross, Hilux, Hilux SW4, Etios, Yaris, SW4, RAV4, Camry, Prius, "
+        "Bandeirante, Fielder",
     ),
     ("carro", "Honda", "Civic, Fit, City, HR-V=HRV, CR-V=CRV, WR-V=WRV, ZR-V=ZRV, Accord"),
     ("carro", "Jeep", "Renegade, Compass, Commander, Wrangler, Cherokee, Grand Cherokee"),
@@ -151,7 +151,7 @@ _CATALOGO: tuple[tuple[str, str, str], ...] = (
     ("carro", "Citroën", "C3, C4, C4 Cactus, C3 Aircross, Aircross, Picasso, Xsara, Berlingo"),
     ("carro", "Mitsubishi", "L200, Pajero, ASX, Outlander, Lancer, Eclipse Cross, Triton"),
     ("carro", "Kia", "Picanto, Cerato, Sportage, Sorento, Soul, Bongo, Rio@"),
-    ("carro", "Chery", "QQ, Tiggo, Arrizo, Celer"),
+    ("carro", "Chery", "QQ, Tiggo 2, Tiggo 3X, Tiggo 5X, Tiggo 7, Tiggo 8, Tiggo, Arrizo, Celer"),
     ("carro", "JAC", "J2, J3, J5, J6, T40, T50"),
     ("carro", "BYD", "Dolphin, Dolphin Mini, Song@, Yuan@, Seal@, King@"),
     ("carro", "Mercedes-Benz", "Classe A, Classe C, C180, C200, A200, GLA, Sprinter"),
@@ -208,16 +208,26 @@ _VERSOES_TEXTO = (
     "Sense Vision Comfort Evolution Launch Platinum Diamond Smart Style Unique Premium Prestige "
     "Exclusive Advance Sedan Hatch Turbo Diesel AT CVT CD CS CE Classic Feline Allure Griffe "
     "Active Shine Live Feel Strada Factor Crosser Lander Tenere Aircross Cactus LXR EXS SXT XLE "
-    "HLX GTX ESDD EXi Locker Country Tropical Runner GS"
+    "HLX GTX ESDD EXi Locker Country Tropical Runner GS RR Sahara Triton Attitude Robust Prime "
+    "Bola Quadrado Today Comodoro Standard Surf Furgão=Furgao Xtreme Midnight Outdoor Action "
+    "Million Seleção=Selecao Rocam Zetec Endura SS NS Hornet Transalp"
 )
-_VERSOES = {palavra.lower(): palavra for palavra in _VERSOES_TEXTO.split()}
+# "Furgão=Furgao": grafia bonita e, depois do "=", como chega sem acento
+_VERSOES = {
+    palavra.split("=")[-1].lower(): palavra.split("=")[0] for palavra in _VERSOES_TEXTO.split()
+}
 _VERSOES.update({"automatico": "Automático", "automatica": "Automática", "aut": "Aut."})
 _CABINES = {"dupla": "Cabine Dupla", "simples": "Cabine Simples", "estendida": "Cabine Estendida"}
+# Versões de duas letras que também são palavra comum: só valem coladas no nome do modelo
+# ("ka se 1.0"), nunca depois do ano ("gol 2015 se der eu vendo").
+_VERSOES_QUE_SAO_PALAVRA = {"se", "si", "es", "ex", "el", "at", "ed", "cd", "ce", "sr", "rs"}
 
 _CILINDRADAS = {
-    50, 70, 90, 100, 110, 115, 120, 125, 135, 150, 155, 160, 180, 190, 200, 220, 225, 230, 250,
-    300, 310, 350, 390, 400, 420, 450, 500, 550, 600, 650, 660, 690, 700, 750, 765, 790, 800,
-    850, 883, 890, 900, 990, 1000, 1050, 1100, 1200, 1250, 1290, 1300, 1600, 1800,
+    50, 70, 90, 100, 110, 115, 120, 125, 135, 150, 155, 160, 175, 180, 190, 200, 220, 225, 230,
+    250, 300, 310, 320, 321, 350, 390, 400, 410, 411, 420, 450, 500, 502, 550, 600, 636, 650,
+    660, 675, 690, 700, 750, 765, 790, 797, 800, 803, 821, 850, 883, 890, 899, 900, 937, 950,
+    959, 990, 1000, 1050, 1098, 1100, 1198, 1199, 1200, 1250, 1260, 1290, 1300, 1500, 1600,
+    1800,
 }  # fmt: skip
 
 _TIPOS = {
@@ -302,10 +312,19 @@ _ANTES_NAO_E_COR = {
     "laudo", "farol", "procedencia", "faixa", "tarja",
 }  # fmt: skip
 
+# Coisas que têm cor própria: perto delas, a cor não é a do veículo ("baú preto").
+_TEM_COR_PROPRIA = {
+    "bau", "bauleto", "capacete", "capacetes", "banco", "bancos", "couro", "roda", "rodas",
+    "teto", "interior", "estofado", "estofamento", "retrovisor", "retrovisores", "adesivo",
+    "adesivos", "capa", "bagageiro", "escapamento", "guidao", "vidro", "vidros", "pelicula",
+    "tapete", "tapetes", "volante", "painel", "lona", "capota", "friso", "frisos", "jaqueta",
+    "luva", "luvas",
+}  # fmt: skip
 # Palavra antes de um ano que mostra que ele não é o ano do veículo.
 _ANTES_NAO_E_ANO = {
     "ipva", "licenciamento", "licenciado", "licenciada", "dpvat", "crlv", "documento", "doc",
-    "exercicio", "multa", "multas", "seguro", "em", "desde", "ate",
+    "exercicio", "multa", "multas", "seguro", "em", "desde", "ate", "dia", "data", "pneu",
+    "pneus", "medida", "aro", "vence", "vencimento",
 }  # fmt: skip
 
 _UNIDADES_KM = {
@@ -339,6 +358,9 @@ _FRASES_VALOR: tuple[tuple[str, str], ...] = tuple(
             ("paguei", _COMPRA),
             ("pagamos", _COMPRA),
             ("pagou", _COMPRA),
+            ("pago", _COMPRA),
+            ("paga", _COMPRA),
+            ("pg", _COMPRA),
             ("custou", _COMPRA),
             ("custo", _COMPRA),
             ("peguei", _COMPRA),
@@ -356,6 +378,7 @@ _FRASES_VALOR: tuple[tuple[str, str], ...] = tuple(
             ("preco da venda", _VENDA),
             ("por quanto sai", _VENDA),
             ("sai por", _VENDA),
+            ("sair por", _VENDA),
             ("saindo por", _VENDA),
             ("vender", _VENDA),
             ("vendo", _VENDA),
@@ -378,15 +401,35 @@ _FRASES_VALOR: tuple[tuple[str, str], ...] = tuple(
         key=lambda item: -len(item[0].split()),
     )
 )
+_PALAVRAS_DE_VALOR = {frase.split()[-1] for frase, _ in _FRASES_VALOR} | {"por", "r$", "rs"}
 # Palavrinhas que podem ficar entre o rótulo e o número ("comprei por R$ 11.500").
 _LIGACOES = {
     "por", "de", "a", "foi", "e", "eh", ":", "=", "-", "uns", "so", "apenas", "na", "no",
     "o", "ela", "ele", "nela", "nele", "nessa", "nesse", "valor", "total", "agora", "ficou",
     "fica", "sera", "vai", "ser", "pra", "para", "esta", "ta", "com", "sao", "atual", "tem",
     "ficar", "muda", "mudar", "trocar", "troca", "certo", "correto", "novo", "nova", "errado",
-    "errada",
+    "errada", "vista", "final", "marcando", "quase", "cerca",
 }  # fmt: skip
-_DEPOIS_DO_VALOR = {"de", "da", "na", "no", "a", "o", "foi", "pra", "para", "e", "eh"}
+# Entre o número e o rótulo que vem depois dele: "11.500 de compra", "9 mil foi a compra".
+_DEPOIS_DO_VALOR = {"de", "da", "na", "no", "a", "o", "foi", "pra", "para"}
+# Verbo depois de "pra" fala do número seguinte: "9 mil pra vender por 12 mil".
+_ROTULOS_SUBSTANTIVO = {
+    "compra", "custo", "venda", "revenda", "anuncio", "preco", "valor de compra",
+    "valor da compra", "preco de compra", "preco da compra", "custo de compra", "valor pago",
+    "valor de venda", "valor da venda", "preco de venda", "preco da venda",
+}  # fmt: skip
+# "IPVA pago", "documento pago": aqui "pago" não é o valor de compra do veículo.
+_ANTES_NAO_E_PAGO = {
+    "ipva", "licenciamento", "dpvat", "crlv", "documento", "doc", "multa", "multas", "seguro",
+    "debito", "debitos", "taxa", "taxas", "tudo", "esta", "ta", "ja",
+}  # fmt: skip
+# Palavra antes de um número que mostra que ele não é km, compra nem venda.
+_ANTES_NAO_E_VALOR = {
+    "fipe", "tabela", "lucro", "margem", "desconto", "gastei", "gasto", "gastos", "gastou",
+    "rua", "av", "avenida", "numero", "casa", "cep", "fone", "tel", "telefone", "celular",
+    "zap", "whatsapp", "contato", "cpf", "cnpj", "rg", "nota", "nf", "fiscal", "protocolo",
+    "contrato", "aro", "pneu", "pneus",
+}  # fmt: skip
 _MOEDA_DEPOIS = {"reais", "real", "conto", "contos", "pila", "pilas"}
 
 _UNIDADES = {
@@ -407,6 +450,14 @@ _CENTENAS = {
 
 # "onze e quinhentos", "onze e meio": jeito falado de dizer 11.500
 _DEPOIS_DO_E = {**_CENTENAS, "meio": 500}
+_NUMEROS_POR_EXTENSO = {*_UNIDADES, *_DEZENAS, *_CENTENAS, "mil", "meio"}
+
+# Para saber o que o "não" nega: "não é um gol" (pula artigo e verbo); "não, pop 110i"
+# (com pontuação depois do "não", o que vem é a correção).
+_ARTIGOS = ("e", "eh", "um", "uma", "o", "a")
+_PONTUACAO = (",", ".", ";", ":", "!", "-")
+_PALAVRAS_DE_CORRECAO = {"ops", "digo", "alias", "corrigindo", "minto", "errei", "perdao"}
+_FRASES_DE_CORRECAO = {("quer", "dizer"), ("na", "verdade"), ("o", "certo")}
 
 # Palavras comuns que nunca são marca nem modelo (para marca/modelo fora do catálogo).
 _COMUNS = set(
@@ -419,7 +470,8 @@ _COMUNS = set(
     "revisado completo completa original financiado financiada quitado quitada essa esse este "
     "isso aquela aquele outra outro tudo nada demais show bonita bonito barato barata cara caro "
     "adiciona adicionar registra registrar inclui incluir lanca lancar bota coloca poe quero "
-    "preciso favor oi ola verdade ainda nunca sempre aquilo dela dele".split()
+    "preciso favor oi ola verdade ainda nunca sempre aquilo dela dele motor apenas versao "
+    "cilindrada cilindradas".split()
 )
 
 _CAMPOS_REMOVIVEIS = {
@@ -446,7 +498,7 @@ _CAMPOS_REMOVIVEIS = {
 }
 _REMOVER = re.compile(
     r"\b(?:sem|tirar?|tire|remover?|remova|apagar?|apague|retirar?|retire|excluir?|exclua|"
-    r"limpar?|limpe|(?:ainda )?nao tem|nao possui|deixa sem)\s+"
+    r"limpar?|limpe|cancelar?|cancele|(?:ainda )?nao tem|nao possui|deixa sem)\s+"
     r"(?:o |a |os |as |esse |essa |este |esta )?(?:campo |dado )?(?:d[aeo] )?"
     r"(ano d[eo] modelo|ano de fabricacao|ano modelo|preco de venda|valor de venda|"
     r"valor de compra|placa|chassi|renavam|cor|km|quilometragem|ano|preco|observacoes|"
@@ -463,6 +515,15 @@ _PLACA_ROTULO = re.compile(
     r"([a-z0-9]+(?:[\- ]\d[a-z0-9]\d{2}\b)?)"
 )
 _DATA = re.compile(r"\b\d{1,2}/\d{1,2}/(?:\d{4}|\d{2})\b")
+_CONTATOS = (
+    re.compile(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b"),  # CNPJ
+    re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b"),  # CPF
+    re.compile(r"\b\d{5}-\d{3}\b"),  # CEP
+    # telefone: (86) 99988-7766, 86 9 9988-7766, 99988-7766, 86999887766
+    re.compile(r"(?:\(\d{2}\)\s*|\b\d{2}\s+)(?:9\s?)?\d{4}-?\d{4}\b"),
+    re.compile(r"\b9\s?\d{4}-\d{4}\b"),
+    re.compile(r"\b\d{2}9\d{8}\b"),
+)
 _PLACA_SOLTA = re.compile(r"\b([a-z]{3})-?(\d[a-z0-9]\d{2})\b")
 _PLACA_MERCOSUL_ESPACO = re.compile(r"\b([a-z]{3}) (\d[a-z]\d{2})\b")
 
@@ -486,30 +547,47 @@ _OUTRAS_SITUACOES = re.compile(
 )
 
 _CANCELAR = re.compile(
-    r"(?:nao |ah |entao |pode |quero |vamos |por favor )*"
+    r"(?:ah |entao |pode |quero |vamos |por favor )*"
     r"(?:cancelar?|cancele|esquece|esqueca|deixa (?:pra|para) la|deixa quieto|desisto|"
     r"desisti|recomecar|recomeca|recomece|comecar de novo|comeca de novo|apagar? tudo|"
-    r"limpar?(?: tudo)?|zerar?(?: tudo)?)"
+    r"tirar? tudo|remover? tudo|descartar?|limpar?(?: tudo)?|zerar?(?: tudo)?)"
     r"(?: tudo| isso| ai| esse cadastro| o cadastro| o rascunho| por favor| de novo| do zero)*"
 )
 _SIM_NUCLEO = {
     "sim", "s", "ss", "confirmo", "confirmar", "confirma", "confirmado", "pode", "cadastrar",
     "cadastra", "cadastre", "isso", "ok", "okay", "certo", "certinho", "fechou", "fechado",
     "bora", "simbora", "beleza", "blz", "show", "perfeito", "correto", "exato", "salvar",
-    "salva", "claro", "positivo", "joia", "otimo", "manda", "uhum", "aham", "yes",
+    "salva", "claro", "positivo", "joia", "otimo", "manda", "uhum", "aham", "yes", "gravar",
+    "grava",
 }  # fmt: skip
 _SIM_ENFEITE = {
     "mesmo", "ta", "esta", "tudo", "ver", "ai", "assim", "ser", "bom", "e", "eh", "por",
     "favor", "pf", "pfv", "obrigado", "obrigada", "obg", "vamos", "agora", "ja", "la", "vai",
-    "a", "o", "moto", "carro", "veiculo", "ela", "ele", "tambem", "entao", "pra", "mim",
+    "a", "o", "moto", "carro", "veiculo", "ela", "ele", "tambem", "entao", "pra", "mim", "so",
 }  # fmt: skip
+# Respostas a "quer acrescentar ou posso cadastrar assim?" que não têm um "sim" dentro.
+_SIM_FRASES = {
+    "ta bom", "esta bom", "tudo bom", "ta otimo", "vai la", "assim mesmo", "assim ta bom",
+    "pode ser assim", "deixa assim", "pode deixar assim", "e so", "manda bala",
+}  # fmt: skip
+# "Não quero acrescentar nada": na confirmação é um "pode cadastrar"; fora dela, um "não".
+_DISPENSA = {
+    "nao precisa", "nao precisa nao", "precisa nao", "nao precisa acrescentar",
+    "nao precisa acrescentar nada", "nao quero acrescentar", "nao quero acrescentar nada",
+    "nao vou acrescentar", "nao vou acrescentar nada", "nada a acrescentar", "sem acrescentar",
+    "nada mais", "mais nada", "nao tem mais nada", "nao tenho mais nada",
+}  # fmt: skip
+_EMOJI_SIM = set("\U0001f44d\U0001f44c\U0001f197\u2705\u2714")  # 👍 👌 🆗 ✅ ✔
+_EMOJI_NAO = set("\U0001f44e\u274c")  # 👎 ❌
 _NAO_NUCLEO = {
     "nao", "n", "nn", "nops", "nope", "errado", "errada", "espera", "espere", "pera", "perai",
     "calma", "incorreto", "negativo", "ops", "segura", "aguarda", "aguarde",
 }  # fmt: skip
 _NAO_ENFEITE = {
     "ainda", "tem", "erro", "ta", "esta", "nada", "disso", "pode", "opa", "um", "momento",
-    "minuto", "ai", "e", "eh", "isso", "assim", "certo", "pouco",
+    "minuto", "ai", "e", "eh", "isso", "assim", "certo", "pouco", "agora", "claro", "que",
+    "cadastra", "cadastrar", "cadastre", "grava", "gravar", "salva", "salvar", "confirma",
+    "confirmar",
 }  # fmt: skip
 _SAUDACAO = re.compile(
     r"(?:oi+e?|ola+|opa|e ai|eae|salve|hey|hello|bom dia|boa tarde|boa noite|tudo bem|"
@@ -531,6 +609,10 @@ _FORA_FORTE = re.compile(
     r"cobranca|boletos?|carne|relatorios?|quantas vendas|quantos vendidos)\b"
 )
 _VENDA_REGISTRO = re.compile(r"\b(?:vendi|dar baixa|baixa de venda|registrar? (?:a |uma )?venda)\b")
+_VARIOS = re.compile(
+    r"\b(?:duas|dois|tres|quatro|cinco|[2-9]|varias|varios|algumas|alguns)\s+"
+    r"(?:motos|carros|veiculos|unidades)\b"
+)
 _PERGUNTA = re.compile(
     r"^(?:quant[oa]s?|qual|quais|quem|quando|onde|cade|me mostra|mostra|mostrar|mostre|"
     r"lista|listar|liste|relatorio|resumo|tem quant)\b"
@@ -565,6 +647,34 @@ _PEDACO = re.compile(r"r\$|\d+(?:[.,]\d+)*|[a-z]+|[^\sa-z0-9]")
 
 def _chave(texto: str) -> tuple[str, ...]:
     return tuple(p for p in _PEDACO.findall(_normalizar(texto)) if p != "-")
+
+
+def _so_palavras(norm: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", norm))
+
+
+def _sem_esticar(palavra: str) -> str:
+    """ "simmm", "naooo", "okk": letra repetida de quem digita no celular."""
+    if palavra in _SIM_NUCLEO or palavra in _NAO_NUCLEO:
+        return palavra
+    curta = re.sub(r"(.)\1+", r"\1", palavra)
+    return curta if curta in _SIM_NUCLEO or curta in _NAO_NUCLEO else palavra
+
+
+def _afirma(limpo: str) -> bool:
+    palavras = [_sem_esticar(p) for p in limpo.split()]
+    if limpo in _SIM_FRASES:
+        return True
+    return any(p in _SIM_NUCLEO for p in palavras) and all(
+        p in _SIM_NUCLEO or p in _SIM_ENFEITE for p in palavras
+    )
+
+
+def _nega(limpo: str) -> bool:
+    palavras = [_sem_esticar(p) for p in limpo.split()]
+    return any(p in _NAO_NUCLEO for p in palavras) and all(
+        p in _NAO_NUCLEO or p in _NAO_ENFEITE for p in palavras
+    )
 
 
 def _montar_catalogo() -> tuple[dict, dict, dict]:
@@ -624,7 +734,8 @@ _PARADAS = (
 class Interpretacao:
     """O que foi entendido de uma mensagem. Nada aqui toca o banco."""
 
-    # cadastro | afirmacao | negacao | cancelar | ajuda | agradecimento | fora_escopo | nada
+    # cadastro | afirmacao | negacao | dispensa | cancelar | ajuda | agradecimento |
+    # fora_escopo | nada
     intencao: str = "nada"
     campos: dict[str, Any] = field(default_factory=dict)
     remover: list[str] = field(default_factory=list)
@@ -725,17 +836,28 @@ def _quantidades(toks: list[_Tok]) -> list[_Qtd]:
     def t(k: int) -> str:
         return toks[k].t if 0 <= k < n and not toks[k].usado else ""
 
-    def resto_do_mil(j: int) -> tuple[Decimal, int]:
-        """ "11 mil e 500", "onze mil e quinhentos", "onze mil quinhentos"."""
-        k = j + 1 if t(j) == "e" else j
+    def resto_do_mil(j: int, inicio: int) -> tuple[Decimal, int]:
+        """O que completa o "mil": "11 mil e 500", "11 mil 500", "onze mil e quinhentos".
+
+        Só centenas e dezenas. Em "paguei 12 mil e uma biz" e "8 mil e 2 chaves" o que vem
+        depois do "e" já é outro assunto, e somar daria 12.001 e 8.002.
+        """
+        com_e = t(j) == "e"
+        k = j + 1 if com_e else j
         if k < n and toks[k].num and not toks[k].usado and toks[k].t.isdigit():
-            seguinte = t(k + 1)
-            if k > j and int(toks[k].t) < 1000 and seguinte not in ("mil", "k"):
+            digitos, seguinte = len(toks[k].t), t(k + 1)
+            grudado = k + 1 < n and toks[k + 1].colado and seguinte.isalpha()
+            if seguinte in ("mil", "k") or (grudado and seguinte not in _UNIDADES_KM):
+                return Decimal(0), j  # "8 mil e 22 mil km", "9 mil 110i"
+            if seguinte in _UNIDADES_KM and t(inicio - 1) in _PALAVRAS_DE_VALOR:
+                return Decimal(0), j  # "paguei 9 mil 300 km rodados": o 300 é do km
+            fim_da_frase = seguinte in _MOEDA_DEPOIS or not seguinte.isalnum()
+            if digitos == 3 or (digitos == 2 and com_e and fim_da_frase):
                 return Decimal(toks[k].t), k + 1
             return Decimal(0), j
-        extenso = _por_extenso(toks, k)
-        if extenso and 0 < extenso[0] < 1000 and t(extenso[1]) != "mil":
-            if k > j or t(k) in _CENTENAS:
+        if t(k) in _CENTENAS or (com_e and t(k) in _DEZENAS):
+            extenso = _por_extenso(toks, k)
+            if extenso and t(extenso[1]) != "mil":
                 return Decimal(extenso[0]), extenso[1]
         return Decimal(0), j
 
@@ -761,7 +883,7 @@ def _quantidades(toks: list[_Tok]) -> list[_Qtd]:
                 if base is not None and base < 1000:
                     valor, j, dinheiro = base * 1000, i + 2, True
                     if seguinte == "mil":
-                        extra, j = resto_do_mil(j)
+                        extra, j = resto_do_mil(j, inicio)
                         valor += extra
             if valor is None:
                 valor = _ler_numero(tok.t)
@@ -781,7 +903,7 @@ def _quantidades(toks: list[_Tok]) -> list[_Qtd]:
             extenso = _por_extenso(toks, i)
             if extenso and t(extenso[1]) == "mil" and extenso[0] > 0:
                 valor, j = Decimal(extenso[0]) * 1000, extenso[1] + 1
-                extra, j = resto_do_mil(j)
+                extra, j = resto_do_mil(j, inicio)
                 valor, dinheiro = valor + extra, True
             elif extenso and 0 < extenso[0] < 100 and t(extenso[1]) == "e":
                 if t(extenso[1] + 1) in _DEPOIS_DO_E:  # "onze e quinhentos"
@@ -789,7 +911,7 @@ def _quantidades(toks: list[_Tok]) -> list[_Qtd]:
                     j, dinheiro = extenso[1] + 2, True
             elif tok.t == "mil" and not (i > 0 and toks[i - 1].num):
                 valor, j, dinheiro = Decimal(1000), i + 1, True
-                extra, j = resto_do_mil(j)
+                extra, j = resto_do_mil(j, inicio)
                 valor += extra
         if valor is None:
             i = inicio + 1
@@ -818,8 +940,9 @@ def _inteiro(valor: int) -> str:
 
 
 def _moeda(valor: Decimal) -> str:
-    texto = f"{valor.quantize(CENTAVO):,.2f}"
-    return "R$ " + texto.replace(",", "§").replace(".", ",").replace("§", ".")
+    texto = f"{abs(valor).quantize(CENTAVO):,.2f}"
+    sinal = "-" if valor < 0 else ""
+    return f"{sinal}R$ " + texto.replace(",", "§").replace(".", ",").replace("§", ".")
 
 
 def _numero_curto(valor: Decimal) -> str:
@@ -831,6 +954,32 @@ def _numero_curto(valor: Decimal) -> str:
 def _expandir_ano(dois_digitos: int, ano_atual: int) -> int:
     seculo = (ano_atual + 1) // 100 * 100
     return seculo + dois_digitos if dois_digitos <= (ano_atual + 1) % 100 else 1900 + dois_digitos
+
+
+def _tem_numero(texto: str) -> bool:
+    return any(c.isdigit() for c in texto)
+
+
+def _cilindrada_na_frente(partes: list[str]) -> list[str]:
+    """Nome de moto no padrão do estoque: "cg titan 160" é a CG 160 Titan."""
+    for posicao, parte in enumerate(partes):
+        if re.fullmatch(r"\d{2,4}[A-Za-z]{0,2}(?: [A-Z])?", parte):
+            return [parte, *partes[:posicao], *partes[posicao + 1 :]]
+    return partes
+
+
+@dataclass(frozen=True)
+class _Mencao:
+    """Um modelo do catálogo citado na mensagem."""
+
+    ini: int
+    fim: int
+    marca: str | None  # só quando veio escrita ("honda biz")
+    modelo: str
+    entrada: _Modelo
+
+    def mesmo_modelo(self, outra: "_Mencao") -> bool:
+        return (self.entrada.marca, self.entrada.nome) == (outra.entrada.marca, outra.entrada.nome)
 
 
 class _Leitor:
@@ -848,6 +997,8 @@ class _Leitor:
         self.qtds: list[_Qtd] = []
         self.frases: list[list] = []  # palavras de compra e venda: [início, fim, campo, usada]
         self.fim_modelo: int | None = None  # token logo depois do modelo ("cg 160 fan 22")
+        self.respondendo = aguardando in ("marca", "modelo")  # perguntei qual é o veículo
+        self.dois_veiculos: tuple[str, str] | None = None  # "troquei um gol numa biz"
         self.ano_unico: int | None = None  # um ano só, valendo para fabricação e modelo
 
     # ----- utilidades -----
@@ -944,8 +1095,10 @@ class _Leitor:
         for padrao in (_PLACA_SOLTA, _PLACA_MERCOSUL_ESPACO):
             for m in padrao.finditer(texto):
                 letras, resto = m[1], m[2]
-                if resto.isdigit() and letras in _PALAVRAS_DE_3 and self.ano_plausivel(int(resto)):
-                    continue  # "gol2014", "fan2022"
+                if resto.isdigit() and letras in _PALAVRAS_DE_3:
+                    modelo = (letras,) in _MODELOS or letras in _FAMILIAS
+                    if self.ano_plausivel(int(resto)) or (modelo and int(resto) in _CILINDRADAS):
+                        continue  # "gol2014", "fan2022", "cbr1000"
                 achadas.append((m.start(), m.end(), (letras + resto).upper()))
         validas = sorted((a for a in achadas if a[2]), key=lambda a: a[0])
         for ini, fim, _ in validas:
@@ -960,6 +1113,12 @@ class _Leitor:
                     self.apagar(0, len(self.buf))
                 except ValueError as erro:
                     self.r.erros.append(str(erro))
+
+    def contatos(self) -> None:
+        """Telefone, CPF, CNPJ e CEP ficam fora da leitura: não são km nem valor."""
+        for padrao in _CONTATOS:
+            for m in list(padrao.finditer(self.texto())):
+                self.apagar(m.start(), m.end())
 
     def situacao(self) -> None:
         texto = self.texto()
@@ -991,18 +1150,29 @@ class _Leitor:
                 return _MARCAS[chave], tamanho
         return None
 
-    def _eh_versao_num(self, j: int) -> bool:
+    def _numero_depois_do_km(self, k: int) -> bool:
+        """ "biz 125 km 30 mil", "gol 1.6 km: 98.000": o km é rótulo do número que vem depois."""
+        while self.t(k) in _UNIDADES_KM or self.t(k) in (":", "=", "e", "eh", "de", "-"):
+            k += 1
+        return k < len(self.toks) and self.toks[k].num and not self.toks[k].usado
+
+    def _eh_versao_num(self, j: int, carro: bool = False) -> bool:
+        """O número do token j é motor ou cilindrada do modelo que acabou de ser lido?"""
         tok = self.toks[j]
         if not tok.num or tok.usado:
             return False
         seguinte = self.t(j + 1)
-        if seguinte in ("mil", "reais") or seguinte in _UNIDADES_KM:
+        if seguinte in ("mil", "reais"):
             return False
         if seguinte == "k" and self.toks[j + 1].colado:
             return False
-        if re.fullmatch(r"\d[.,]\d", tok.t):
+        if re.fullmatch(r"\d[.,]\d", tok.t):  # motor nunca é quilometragem: "uno 1.0 km 100 mil"
             return Decimal("0.6") <= Decimal(tok.t.replace(",", ".")) <= Decimal("7.0")
-        return tok.t.isdigit() and int(tok.t) in _CILINDRADAS
+        if not tok.t.isdigit() or int(tok.t) not in _CILINDRADAS:
+            return False
+        if carro and int(tok.t) < 1000:
+            return False  # "fusca 70", "gol 90": em carro é o ano
+        return seguinte not in _UNIDADES_KM or self._numero_depois_do_km(j + 1)
 
     def _ler_versao_num(self, j: int) -> tuple[str, int]:
         texto = self.toks[j].t.replace(",", ".")
@@ -1011,13 +1181,26 @@ class _Leitor:
             sufixo = self.toks[k].t
             if sufixo in ("cc", "cilindradas"):
                 return texto, k + 1
-            if len(sufixo) == 1 and sufixo.isalpha() and sufixo != "k":
+            medida = sufixo in ("k", "cv", "hp", "kg") or sufixo in _UNIDADES_KM
+            if len(sufixo) <= 2 and sufixo.isalpha() and not medida:  # 110i, 300F, 1000RR
                 return texto + (sufixo if sufixo == "i" else sufixo.upper()), k + 1
         if self.t(k) in ("cc", "cilindradas"):
             return texto, k + 1
         return texto, k
 
-    def _versoes(self, j: int, tem_cilindrada: bool = False) -> tuple[list[str], int]:
+    def _palavra_de_versao(self, j: int, carro: bool) -> bool:
+        """Palavra fora do dicionário entre o modelo e o motor: "saveiro robust 1.6",
+        "gol bola 1.0". Só vale assim, espremida: sozinha poderia ser qualquer coisa."""
+        tok = self.toks[j]
+        if not tok.palavra or len(tok.t) < 3 or tok.t in _PARADAS or tok.t in _NUMEROS_POR_EXTENSO:
+            return False
+        if self._marca_em(j) or (tok.t,) in _MODELOS or tok.t in _FAMILIAS:
+            return False
+        return j + 1 < len(self.toks) and self._eh_versao_num(j + 1, carro)
+
+    def _versoes(
+        self, j: int, tem_cilindrada: bool = False, carro: bool = False
+    ) -> tuple[list[str], int]:
         """Versão e motor depois do modelo: "160 Fan", "1.0", "Way", "16V", "4x4".
 
         Só uma cilindrada e um motor por modelo: em "titan 150 800" o 800 já é outra coisa.
@@ -1025,13 +1208,14 @@ class _Leitor:
         partes: list[str] = []
         n = len(self.toks)
         vistos = {"inteiro": tem_cilindrada, "decimal": False}
+        fora_do_dicionario = False
         while j < n and len(partes) < 7:
             tok = self.toks[j]
             if tok.usado:
                 break
             if tok.num:
                 especie = "inteiro" if tok.t.isdigit() else "decimal"
-                if self._eh_versao_num(j) and not vistos[especie]:
+                if self._eh_versao_num(j, carro) and not vistos[especie]:
                     vistos[especie] = True
                     texto, j = self._ler_versao_num(j)
                     if texto.isdigit() and self.t(j) in ("z", "s", "x", "r", "f", "l"):
@@ -1071,6 +1255,11 @@ class _Leitor:
                 partes.append((tok.t + self.toks[j + 1].t).upper())
                 j += 2
                 continue
+            if not fora_do_dicionario and self._palavra_de_versao(j, carro):
+                fora_do_dicionario = True
+                partes.append(_bonito(self.trecho(j, j + 1)))
+                j += 1
+                continue
             break
         return partes, j
 
@@ -1085,7 +1274,7 @@ class _Leitor:
                 numero, j = self._ler_versao_num(i + 1)
                 versoes, j = self._versoes(j, tem_cilindrada=True)
                 return " ".join([familia, numero, nome, *versoes]), entrada, j
-            if not exige_numero:
+            if not exige_numero or self.respondendo:  # perguntei o modelo: "fan" já basta
                 return f"{familia} {nome}", entrada, i + 1
             return None
         for tamanho in range(min(_MAIOR_CHAVE, n - i), 0, -1):
@@ -1107,7 +1296,10 @@ class _Leitor:
             if not validos:
                 continue
             escolhido = next((c for c in validos if c.marca == marca_antes), validos[0])
-            versoes, j = self._versoes(j)
+            carro = escolhido.tipo == TipoVeiculo.carro
+            versoes, j = self._versoes(j, carro=carro)
+            if not carro:
+                versoes = _cilindrada_na_frente(versoes)
             return " ".join([escolhido.nome, *versoes]), escolhido, j
         return None
 
@@ -1146,8 +1338,102 @@ class _Leitor:
         extra, fim_extra = self._modelo_livre(fim)
         return (f"{modelo} {extra}", fim_extra) if extra else (modelo, fim)
 
+    def _antes_de(self, i: int, pular: tuple[str, ...] = _ARTIGOS) -> int:
+        """Índice do token antes de i, sem contar artigo nem "é" ("não é um gol")."""
+        k = i - 1
+        while k >= 0 and i - k <= 6 and self.t(k) in pular:
+            k -= 1
+        return k
+
     def _negado(self, i: int) -> bool:
-        return "nao" in (self.t(i - 1), self.t(i - 2), self.t(i - 3))
+        """ "não é gol", "moto não": o que vem logo depois do "não", sem pontuação no meio,
+        é o que não vale."""
+        return self.t(self._antes_de(i)) == "nao"
+
+    def _corrige(self, i: int) -> bool:
+        """ "biz 125... não, pop 110i", "preta, quer dizer, vermelha": depois do "não" com
+        pontuação (ou de uma palavra de correção), o que vem é o certo."""
+        k = self._antes_de(i, _ARTIGOS + _PONTUACAO)
+        if self.t(k) in _PALAVRAS_DE_CORRECAO or (self.t(k - 1), self.t(k)) in _FRASES_DE_CORRECAO:
+            return True
+        return self.t(k) == "nao" and self.t(k + 1) in _PONTUACAO
+
+    def _mencoes(self) -> tuple[list[_Mencao], tuple[str, int, int] | None]:
+        """Todos os modelos do catálogo citados na mensagem, na ordem, e a primeira marca que
+        apareceu sozinha antes deles."""
+        achadas: list[_Mencao] = []
+        marca_solta: tuple[str, int, int] | None = None
+        i, n = 0, len(self.toks)
+        while i < n:
+            if self.toks[i].usado:
+                i += 1
+                continue
+            inicio, marca = i, self._marca_em(i)
+            if marca:
+                i += marca[1]
+            achado = self._modelo_em(i, marca[0] if marca else None)
+            if achado:
+                achadas.append(_Mencao(inicio, achado[2], marca[0] if marca else None, *achado[:2]))
+                i = achado[2]
+            elif marca:
+                if marca_solta is None and not achadas:
+                    marca_solta = (marca[0], inicio, i)
+            else:
+                i += 1
+        return achadas, marca_solta
+
+    def _mencao_que_vale(self, mencoes: list[_Mencao]) -> _Mencao | None:
+        """Com dois modelos diferentes na mensagem, qual é o do cadastro? None = não dá para
+        saber (são dois veículos: "troquei um gol numa biz")."""
+        primeira = mencoes[0]
+        outra = next((m for m in mencoes[1:] if not m.mesmo_modelo(primeira)), None)
+        if outra is None:
+            return primeira
+        if self._negado(primeira.ini) and not self._negado(outra.ini):
+            return outra  # "não é gol, é voyage"
+        if self._corrige(outra.ini):
+            return outra  # "biz 125... não, pop 110i"
+        if self._negado(outra.ini):
+            return primeira  # "é gol, não voyage"
+        self.dois_veiculos = (primeira.modelo, outra.modelo)
+        return None
+
+    def _continuar_modelo(self, modelo: str, fim: int, entrada: _Modelo) -> str:
+        """Versão escrita depois do ano ou da cor: "strada 2018 branca cabine simples",
+        "corolla 2015 xei", "onix 2018 1.4 lt", "titan 2015 150"."""
+        toks, n, k = self.toks, len(self.toks), fim
+        carro = entrada.tipo == TipoVeiculo.carro
+        resto = modelo[len(entrada.nome) :]  # o que já veio depois do nome: "160 Fan"
+        while k < n and not toks[k].usado:  # pula o ano e a cor
+            if self._inteiro_em(k, (2, 4)) is not None and self.t(k + 1) == "/":
+                if self._inteiro_em(k + 2, (2, 4)) is None:
+                    break
+                k += 3
+            elif (ano := self._inteiro_em(k, (4,))) is not None and self.ano_plausivel(ano):
+                k += 1
+            elif toks[k].t in _CORES or (toks[k].t in _TONS and toks[k - 1].t in _CORES):
+                k += 1
+            else:
+                break
+        if k == fim or k >= n or toks[k].usado:
+            return modelo
+        primeiro = toks[k]
+        if primeiro.num:
+            motor = re.fullmatch(r"[0-3][.,]\d", primeiro.t) is not None
+            cilindrada = not carro and not _tem_numero(resto)
+            if not (motor or cilindrada) or not self._eh_versao_num(k, carro):
+                return modelo
+        elif primeiro.t in _VERSOES:
+            if len(primeiro.t) < 3 and primeiro.t in _VERSOES_QUE_SAO_PALAVRA:
+                return modelo
+        elif not (primeiro.t == "cabine" and self.t(k + 1) in _CABINES):
+            return modelo
+        versoes, fim_versoes = self._versoes(k, tem_cilindrada=_tem_numero(resto), carro=carro)
+        if not versoes:
+            return modelo
+        self.usar(k, fim_versoes)
+        partes = resto.split() + versoes
+        return " ".join([entrada.nome, *(partes if carro else _cilindrada_na_frente(partes))])
 
     def veiculo(self) -> None:
         toks, campos = self.toks, self.r.campos
@@ -1194,38 +1480,18 @@ class _Leitor:
                     modelo = None
 
         # Marca e modelo do catálogo, na ordem em que aparecem
-        respondendo = self.aguardando in ("marca", "modelo")
         marca_solta: tuple[str, int, int] | None = None  # (nome, início, fim)
-        i = 0
-        while i < n and modelo is None:
-            if toks[i].usado:
-                i += 1
-                continue
-            achada = self._marca_em(i)
-            if achada:
-                nome, tamanho = achada
-                depois = self._modelo_em(i + tamanho, nome)
-                if depois:
-                    modelo, entrada, fim = depois
-                    if respondendo:
-                        modelo, fim = self._completar(modelo, fim)
-                    marca = marca or nome
-                    self.usar(i, fim)
-                    self.fim_modelo = fim
-                    break
-                if marca_solta is None:
-                    marca_solta = (nome, i, i + tamanho)
-                i += tamanho
-                continue
-            achado = self._modelo_em(i, None)
-            if achado:
-                modelo, entrada, fim = achado
-                if respondendo:
+        if modelo is None:
+            mencoes, marca_solta = self._mencoes()
+            mencao = self._mencao_que_vale(mencoes) if mencoes else None
+            if mencao is not None:
+                modelo, entrada, fim = mencao.modelo, mencao.entrada, mencao.fim
+                if self.respondendo:
                     modelo, fim = self._completar(modelo, fim)
-                self.usar(i, fim)
+                marca = marca or mencao.marca
+                self.usar(mencao.ini, fim)
                 self.fim_modelo = fim
-                break
-            i += 1
+                modelo = self._continuar_modelo(modelo, fim, entrada)
 
         if marca_solta and marca is None:
             nome, ini, fim = marca_solta
@@ -1279,18 +1545,30 @@ class _Leitor:
             j = q.j
             if self.t(j) == "de" and self.t(j + 1) in _UNIDADES_KM:
                 j += 1
-            if self.t(j) in _UNIDADES_KM and not self._ano_antes_do_km(q, j):
-                fim = j + 1
+            unidade_depois = self.t(j) in _UNIDADES_KM and not self._ano_antes_do_km(q, j)
+            if unidade_depois:
+                ini, fim = q.i, j + 1
                 while self.t(fim) in _UNIDADES_KM:
                     fim += 1
-                q.rotulo = "km"
-                self.usar(q.i, fim)
-                ordem.append((q.i, int(q.valor)))
-                continue
-            k = self._voltar(q.i)
-            if k >= 0 and self.t(k) in _ROTULOS_KM:
-                q.rotulo = "km"
-                self.usar(k, q.j)
+            else:  # "km 18500", "rodou 30 mil", "km rodado 20 mil"
+                ini, fim = self._voltar(q.i), q.j
+                if self.t(ini) not in _ROTULOS_KM and self.t(ini) not in _UNIDADES_KM:
+                    continue
+            escrito = self.trecho(q.i, q.j)
+            q.rotulo = "km"
+            self.usar(ini, fim)
+            if q.valor != q.valor.to_integral_value():  # "18,5 km": faltou o "mil"?
+                self.r.erros.append(
+                    f"Não entendi a quilometragem “{escrito}”. Se for {escrito} mil, "
+                    f"escreva “{escrito} mil km”."
+                )
+            elif unidade_depois and self._pode_ser_cilindrada(q):
+                modelo = self.r.campos["modelo"]
+                self.r.erros.append(
+                    f"Não sei se “{escrito} km” é a cilindrada ou a quilometragem. "
+                    f"Escreva, por exemplo: “{modelo} {escrito}, 20 mil km”."
+                )
+            else:
                 ordem.append((q.i, int(q.valor)))
         todos = sorted(ordem)
         if not todos:
@@ -1301,6 +1579,31 @@ class _Leitor:
                 f"Você falou de km mais de uma vez; fiquei com o último: "
                 f"{_inteiro(todos[-1][1])} km."
             )
+
+    def _pode_ser_cilindrada(self, q: _Qtd) -> bool:
+        """ "titan 160 km baixo": o número logo depois do nome da moto, sem outro número de km
+        na frase, tanto pode ser a cilindrada quanto a quilometragem."""
+        campos = self.r.campos
+        return (
+            q.simples
+            and q.i == self.fim_modelo
+            and int(q.valor) in _CILINDRADAS
+            and campos.get("tipo") == TipoVeiculo.moto
+            and not _tem_numero(campos.get("modelo", ""))
+        )
+
+    def descartes(self) -> None:
+        """ "o preço é 15.900 e não 14.900", "km 20 mil, não 25 mil": o número logo depois do
+        "não" é o que não vale. Com pontuação ("zero km... não, 15 mil") ele é a correção."""
+        if len(self.qtds) < 2:
+            return
+        for q in self.qtds:
+            if self.t(self._voltar(q.i)) != "nao":
+                continue
+            fim = q.j
+            while self.t(fim) in _UNIDADES_KM:
+                fim += 1
+            self.usar(q.i, fim)
 
     def _ano_antes_do_km(self, q: _Qtd, j: int) -> bool:
         """ "xre 300 2021 km 15000": aqui "km" é rótulo do número seguinte, e 2021 é o ano."""
@@ -1358,6 +1661,10 @@ class _Leitor:
             fabricacao, segundo = self._ano_em(i), self._inteiro_em(i + 2, (2, 4))
             if fabricacao is None or segundo is None:
                 continue
+            curto = len(toks[i].t) == 2 and len(toks[i + 2].t) == 2
+            medida = i + 3 < n and toks[i + 3].num and toks[i + 3].colado  # pneu 90/90-18
+            if curto and (medida or self.t(i - 1) in _ANTES_NAO_E_ANO):
+                continue
             if len(toks[i + 2].t) == 4:
                 modelo = segundo
             elif len(toks[i].t) == 4:
@@ -1370,6 +1677,8 @@ class _Leitor:
                 continue
             if 0 <= modelo - fabricacao <= 1:
                 campos["ano_fabricacao"], campos["ano_modelo"] = fabricacao, modelo
+            elif curto:
+                continue  # "dia 12/11" é data, não ano
             else:
                 self.r.erros.append(
                     f"Não entendi o ano {self.trecho(i, i + 3)}: o ano do modelo costuma ser "
@@ -1379,15 +1688,19 @@ class _Leitor:
             if self.t(i - 1) in ("ano", "modelo"):
                 self.usar(i - 1, i)
 
-        partes = {"fabricacao", "fabricada", "fabricado", "fab", "modelo"}
+        partes = {"fabricacao", "fabricada", "fabricado", "fab", "modelo", "mod"}
         for i, tok in enumerate(toks):
             if tok.usado or (tok.t != "ano" and tok.t not in partes):
                 continue
-            alvo = None if tok.t == "ano" else ("modelo" if tok.t == "modelo" else "fabricacao")
+            alvo = (
+                None
+                if tok.t == "ano"
+                else ("modelo" if tok.t in ("modelo", "mod") else "fabricacao")
+            )
             j = i + 1
             while self.t(j) in ("de", "do", "da", "e", "eh", "em", ":", "=", *partes):
                 if self.t(j) in partes:
-                    alvo = "modelo" if self.t(j) == "modelo" else "fabricacao"
+                    alvo = "modelo" if self.t(j) in ("modelo", "mod") else "fabricacao"
                 j += 1
             ano = self._ano_em(j)
             if ano is None or self.t(j + 1) in ("mil", "/"):
@@ -1414,9 +1727,17 @@ class _Leitor:
         for q in self.qtds:
             if not self._livre(q) or not q.simples or q.j != q.i + 1:
                 continue
-            if len(toks[q.i].t) != 4 or not self.ano_plausivel(int(q.valor)):
-                continue
+            if len(toks[q.i].t) != 4 or self.t(q.i - 1) == "por":
+                continue  # "biz 2015 por 2000": depois de "por" é dinheiro
             if self._frase_valor_antes(q.i) or (esperando_numero and so_um_numero):
+                continue
+            if not self.ano_plausivel(int(q.valor)):
+                if q.i == self.fim_modelo and 1900 <= q.valor <= 2100:  # "biz 2030"
+                    self.usar(q.i, q.j)
+                    self.r.erros.append(
+                        f"O ano {q.valor} está fora da faixa que eu aceito "
+                        f"({ANO_MINIMO} a {self.ano_maximo})."
+                    )
                 continue
             if self.t(q.i - 1) in _ANTES_NAO_E_ANO:  # "IPVA 2026 pago", "comprada em 2023"
                 self.usar(q.i, q.j)
@@ -1461,6 +1782,15 @@ class _Leitor:
             if not self.ano_plausivel(ano):
                 continue
             self.usar(i, i + 1)
+            # "biz 19-20": o hífen some na leitura e o segundo número vem grudado
+            par = (
+                self._inteiro_em(i + 1, (2,)) if i + 1 < len(toks) and toks[i + 1].colado else None
+            )
+            modelo = _expandir_ano(par, self.ano_atual) if par is not None else None
+            if modelo is not None and modelo - ano == 1:
+                self.usar(i + 1, i + 2)
+                campos["ano_fabricacao"], campos["ano_modelo"] = ano, modelo
+                break
             campos["ano_fabricacao"] = campos["ano_modelo"] = ano
             self.r.avisos.append(
                 f"Considerei “{toks[i].t}” como o ano {ano}, de fabricação e do modelo."
@@ -1479,7 +1809,10 @@ class _Leitor:
                 nome, j = f"{nome} {_TONS[self.t(j)]}", j + 1
             return nome, j
 
+        # A cor do veículo é a primeira que aparece ("vermelha com baú preto"), a não ser que
+        # outra venha com o rótulo "cor" ou como correção ("preta... não, vermelha").
         achada: str | None = None
+        rotulada = False
         i = 0
         while i < n:
             lida = cor_em(i)
@@ -1491,14 +1824,20 @@ class _Leitor:
             if antes in _ANTES_NAO_E_COR or (antes == "em" and toks[i].t in ("branco", "branca")):
                 i = j
                 continue
+            if any(self.t(k) in _TEM_COR_PROPRIA for k in range(max(0, i - 3), i)):
+                i = j  # "banco de couro preto", "capacete vermelho de brinde"
+                continue
             if self.t(j) in ("e", "com", "/"):  # "vermelha e preta"
                 segunda = cor_em(j + 1)
                 if segunda:
                     nome, j = f"{nome} e {segunda[0].lower()}", segunda[1]
+            tem_rotulo = antes == "cor" or self.t(self._voltar(i)) == "cor"
+            corrige = self._corrige(i) or self.t(self._antes_de(i)) == "agora"
             self.usar(i, j)
-            if self.t(i - 1) == "cor":
+            if antes == "cor":
                 self.usar(i - 1, i)
-            achada = nome
+            if achada is None or corrige or (tem_rotulo and not rotulada):
+                achada, rotulada = nome, rotulada or tem_rotulo
             i = j
         if achada is None:
             for i, tok in enumerate(toks):  # "cor abóbora": cor fora da lista, com rótulo
@@ -1515,16 +1854,21 @@ class _Leitor:
             self.r.campos["cor"] = achada
 
     def _frases_de_valor(self) -> list[list]:
-        """Onde aparecem palavras de compra e venda: [início, fim, campo, usada]."""
+        """Onde aparecem palavras de compra e venda: [início, fim, campo, usada, texto]."""
         frases: list[list] = []
         i, n = 0, len(self.toks)
         while i < n:
             for frase, campo in _FRASES_VALOR:
                 partes = frase.split()
-                if [self.t(k) for k in range(i, i + len(partes))] == partes:
-                    frases.append([i, i + len(partes), campo, False])
-                    i += len(partes) - 1
-                    break
+                if [self.t(k) for k in range(i, i + len(partes))] != partes:
+                    continue
+                quitado = frase in ("pago", "paga") and any(
+                    self.t(k) in _ANTES_NAO_E_PAGO for k in range(max(0, i - 3), i)
+                )
+                if not quitado:  # "IPVA 2026 pago" não é o valor de compra
+                    frases.append([i, i + len(partes), campo, False, frase])
+                i += len(partes) - 1
+                break
             i += 1
         return frases
 
@@ -1547,19 +1891,25 @@ class _Leitor:
                 k, passos = k + 1, passos + 1
             if exige_ligacao and passos == 0:
                 return None
+            finalidade = passos > 0 and self.t(k - 1) in ("pra", "para")
             for f in frases:
                 if not f[3] and f[0] == k:
+                    if finalidade and f[4] not in _ROTULOS_SUBSTANTIVO:
+                        return None  # "9 mil pra vender por 12 mil": o verbo é do 12 mil
                     f[3] = True
                     return f[2]
             return None
 
-        for posicao, q in enumerate(candidatos):
-            if depois_primeiro:
-                campo = depois(q, False) or antes(q)
-            else:
-                campo = antes(q) or depois(q, True)
-            if campo:
-                ligacoes[posicao] = campo
+        # Uma leitura inteira de cada vez: se cada número pegasse o rótulo de qualquer lado,
+        # "9 mil e vendo por 12 mil" daria 9 mil de venda.
+        if depois_primeiro:
+            leituras = (lambda q: depois(q, False), antes)
+        else:
+            leituras = (antes, lambda q: depois(q, True))
+        for leitura in leituras:
+            for posicao, q in enumerate(candidatos):
+                if posicao not in ligacoes and (campo := leitura(q)):
+                    ligacoes[posicao] = campo
         # Palavra distante: "comprei uma CG 160 vermelha por 11.500". Sem "por" nem R$ o
         # número pode ser km ("comprei uma biz 2021 22 mil"): aí fica para a pergunta.
         for indice, f in enumerate(frases):
@@ -1586,20 +1936,13 @@ class _Leitor:
     def _parece_dinheiro(q: _Qtd) -> bool:
         return q.dinheiro or q.valor >= 1000
 
-    def _descartado(self, q: _Qtd) -> bool:
-        """ "o preço é 15.900 e não 14.900": o número depois de "e não" é o que não vale."""
-        k, passos = q.i - 1, 0
-        while k >= 0 and passos < 3 and self.t(k) in _LIGACOES - {"e"}:
-            k, passos = k - 1, passos + 1
-        return self.t(k) == "nao" and self.t(k - 1) == "e"
-
     def valores(self) -> None:
         candidatos = []
         for q in self.qtds:
             if not self._livre(q):
                 continue
-            if self._descartado(q):
-                self.usar(q.i, q.j)
+            if not q.cifrao and self.t(self._voltar(q.i)) in _ANTES_NAO_E_VALOR:
+                self.usar(q.i, q.j)  # "tabela fipe 15 mil", "lucro de 3 mil", "gastei 500"
             else:
                 candidatos.append(q)
         if not candidatos:
@@ -1623,7 +1966,8 @@ class _Leitor:
                     self.r.soltos.append((q.valor, q.cifrao))
                 continue
             if campo == "km":
-                self.r.campos["km"] = int(q.valor)
+                if q.valor == q.valor.to_integral_value():
+                    self.r.campos["km"] = int(q.valor)
                 continue
             if campo in vistos and vistos[campo][0] != q.valor:
                 nome = "valor de compra" if campo == _COMPRA else "preço de venda"
@@ -1705,20 +2049,23 @@ class _Leitor:
 
     def ler(self) -> Interpretacao:
         r = self.r
-        limpo = " ".join(re.findall(r"[a-z0-9]+", self.norm))
-        palavras = limpo.split()
-        if not palavras:
+        limpo = _so_palavras(self.norm)
+        if not limpo:
+            sinais = {c for c in self.original if c in _EMOJI_SIM or c in _EMOJI_NAO}
+            if sinais and sinais <= _EMOJI_SIM:  # 👍 no lugar do "sim"
+                r.intencao = "afirmacao"
+            elif sinais and sinais <= _EMOJI_NAO:
+                r.intencao = "negacao"
             return r
-        if _CANCELAR.fullmatch(limpo):
+        # "não, cancela" e "não, pode cadastrar": com a pontuação, o que vale é o resto.
+        # Sem ela ("não cancela", "não pode cadastrar") a frase inteira é uma negação.
+        m = re.match(r"\s*nao\s*[,.;!]+\s*(\S.*)$", self.norm, re.DOTALL)
+        resto = _so_palavras(m[1]) if m else ""
+        if _CANCELAR.fullmatch(limpo) or _CANCELAR.fullmatch(resto):
             r.intencao = "cancelar"
             return r
-        sim = all(p in _SIM_NUCLEO or p in _SIM_ENFEITE for p in palavras) and (
-            any(p in _SIM_NUCLEO for p in palavras)
-            or limpo in ("ta bom", "esta bom", "tudo bom", "ta otimo", "vai la")
-        )
-        nao = all(p in _NAO_NUCLEO or p in _NAO_ENFEITE for p in palavras) and any(
-            p in _NAO_NUCLEO for p in palavras
-        )
+        sim = _afirma(limpo) or _afirma(resto)
+        nao = _nega(limpo) and not sim
         if _FORA_FORTE.search(limpo):
             r.intencao = "fora_escopo"
             r.venda = _VENDA_REGISTRO.search(limpo) is not None
@@ -1729,11 +2076,13 @@ class _Leitor:
         self.datas()
         self.documentos()
         self.placa()
+        self.contatos()
         self.situacao()
         self.toks = _tokenizar(self.texto())
         self.veiculo()
         self.veiculo_respondido()
         self.qtds = _quantidades(self.toks)
+        self.descartes()
         self.frases = self._frases_de_valor()
         self.anos_marcados()
         self.quilometragem()
@@ -1742,10 +2091,24 @@ class _Leitor:
         self.valores()
         self.resposta_curta()
 
+        varios = _VARIOS.search(limpo)
+        if self.dois_veiculos or varios:  # não dá para saber de qual veículo é cada dado
+            nomes = " ({} e {})".format(*self.dois_veiculos) if self.dois_veiculos else ""
+            r.campos.clear()
+            r.remover.clear()
+            r.soltos.clear()
+            r.avisos.clear()
+            r.erros[:] = [
+                f"Entendi mais de um veículo nessa mensagem{nomes}. Eu cadastro um de cada "
+                "vez: mande os dados de um só."
+            ]
+
         pergunta = "?" in self.norm or _PERGUNTA.match(limpo) is not None
         tem_dados = bool(r.campos or r.remover or r.erros or r.soltos)
         pede_ajuda = _SAUDACAO.fullmatch(limpo) or _AJUDA.search(limpo)
-        if nao and not tem_dados:
+        if limpo in _DISPENSA and not tem_dados:
+            r.intencao = "dispensa"
+        elif nao and not tem_dados:
             r.intencao = "negacao"
         elif sim and not (pede_ajuda and self.aguardando != "confirmacao"):
             r.intencao = "afirmacao"
@@ -1829,6 +2192,9 @@ _SITUACOES = {
 }
 _TIPO = {TipoVeiculo.moto: "Moto", TipoVeiculo.carro: "Carro"}
 _ORDEM_OBRIGATORIOS = ("marca", "modelo", "tipo", "valor_compra")
+_IDENTIFICACAO = {"tipo", "marca", "modelo"}
+# dados que são de um veículo só: se o modelo muda, vale avisar que eles ficaram
+_ORDEM_DA_FICHA = ("ano_modelo", "cor", "km", "placa", "chassi", "renavam", _COMPRA, _VENDA)
 _SUGERIDOS = ("ano_modelo", "km", "placa", "preco_venda")
 _LIMITES_TEXTO = {"marca": 60, "modelo": 120, "cor": 40}
 
@@ -2041,8 +2407,11 @@ def conversar(
     """Uma rodada da conversa: entende a mensagem, atualiza o rascunho e responde."""
     ano_maximo = hoje().year + 1
     rascunho: dict[str, Any] = estado.rascunho.model_dump(exclude_none=True) if estado else {}
+    # O estado vem do navegador: só valem etapas de estoque e a mesma régua das mensagens.
     if rascunho.get("situacao") not in _SITUACOES:
-        rascunho.pop("situacao", None)  # o estado vem do navegador: só valem etapas de estoque
+        rascunho.pop("situacao", None)
+    for campo in [c for c, valor in rascunho.items() if _conferir(c, valor, ano_maximo)]:
+        del rascunho[campo]
     aguardando = estado.aguardando if estado else None
     tinha_rascunho = bool(rascunho)
     lido = interpretar(mensagem, aguardando)
@@ -2051,6 +2420,8 @@ def conversar(
     avisos: list[str] = []
     acao = "nenhuma"
     veiculo_criado: schemas.AssistenteVeiculo | None = None
+    # opcionais que a pessoa acabou de dizer que não tem ("sem placa"): não cobro de novo
+    dispensados = {"ano_modelo" if c == "ano_fabricacao" else c for c in lido.remover}
 
     def responder(proximo: str | None) -> schemas.AssistenteResposta:
         faltam = _faltando(rascunho)
@@ -2064,7 +2435,11 @@ def conversar(
             ),
             ficha=_ficha(db, usuario, rascunho),
             faltando=[_campo(c) for c in faltam],
-            sugeridos=[_campo(c) for c in _SUGERIDOS if rascunho and _campo_vazio(rascunho, c)],
+            sugeridos=[
+                _campo(c)
+                for c in _SUGERIDOS
+                if rascunho and c not in faltam and _campo_vazio(rascunho, c)
+            ],
             pronto=bool(rascunho) and not faltam and duplicado is None,
             acao=acao,
             veiculo=veiculo_criado,
@@ -2091,7 +2466,9 @@ def conversar(
             paragrafos.append(_pergunta(faltam[0], faltam))
             return responder(faltam[0])
         acao = "confirmar"
-        sugeridos = [_sem_artigo(c) for c in _SUGERIDOS if _campo_vazio(rascunho, c)]
+        sugeridos = [
+            _sem_artigo(c) for c in _SUGERIDOS if c not in dispensados and _campo_vazio(rascunho, c)
+        ]
         if sugeridos:
             paragrafos.append(
                 f"Faltou {_lista(sugeridos)}. Quer acrescentar ou posso cadastrar assim?"
@@ -2129,7 +2506,13 @@ def conversar(
 
     # 2. Confirmação
     muda_algo = bool(lido.remover) or any(rascunho.get(c) != v for c, v in lido.campos.items())
-    if lido.intencao == "afirmacao" and not muda_algo:
+    confirmou = lido.intencao == "afirmacao"
+    if lido.intencao == "dispensa":
+        # "não precisa": resposta ao "quer acrescentar ou posso cadastrar assim?"
+        confirmou = aguardando == "confirmacao" and any(
+            _campo_vazio(rascunho, c) for c in _SUGERIDOS
+        )
+    if confirmou and not muda_algo:
         if aguardando == "confirmacao" and not _faltando(rascunho):
             duplicado = _duplicado(db, rascunho)
             if duplicado is not None:
@@ -2170,7 +2553,7 @@ def conversar(
             paragrafos.append(f"Ainda não dá para cadastrar: falta {nomes}.")
         return seguir()
 
-    if lido.intencao == "negacao":
+    if lido.intencao in ("negacao", "dispensa"):
         if aguardando == "confirmacao" and rascunho:
             paragrafos.append(
                 "Sem problema, não gravei nada. O que precisa corrigir? Por exemplo: "
@@ -2223,6 +2606,7 @@ def conversar(
     removidos = [campo for campo in lido.remover if campo in rascunho]
     for campo in removidos:
         del rascunho[campo]
+    modelo_anterior = rascunho.get("modelo")
     mudou: list[str] = []
     for campo, valor in lido.campos.items():
         problema = _conferir(campo, valor, ano_maximo)
@@ -2250,7 +2634,18 @@ def conversar(
         nomes = _lista(sorted({_sem_artigo(c) for c in removidos}))
         paragrafos.append(f"Tirei da ficha: {nomes}.")
     elif lido.remover and not mudou:
-        paragrafos.append("Esse campo já estava vazio.")
+        nomes = _lista(sorted({_sem_artigo(c) for c in lido.remover}))
+        paragrafos.append(f"Certo, a ficha fica sem {nomes}.")
+    if modelo_anterior and "modelo" in mudou and len(set(mudou) - _IDENTIFICACAO) >= 2:
+        # outro modelo e vários dados novos de uma vez: pode ser outro veículo
+        herdados = [c for c in _ORDEM_DA_FICHA if c in rascunho and c not in lido.campos]
+        if herdados:
+            nomes = _lista([_sem_artigo(c) for c in herdados])
+            paragrafos.append(
+                f"Troquei o modelo de {modelo_anterior} para {rascunho['modelo']} e mantive o "
+                f"que já estava na ficha ({nomes}). Se for outro veículo, responda “cancela” e "
+                "mande os dados de novo."
+            )
     if lido.soltos:
         paragrafos.append(_frase_soltos(lido.soltos))
     if not paragrafos:

@@ -771,7 +771,7 @@ def test_observacoes_ficam_como_foram_escritas():
             )
         ],
         *[(frase, "agradecimento") for frase in ("obrigado", "valeu", "muito obrigada")],
-        *[(frase, "nada") for frase in ("asdfgh", "kkkk", "?", "...", "👍", "123", "km")],
+        *[(frase, "nada") for frase in ("asdfgh", "kkkk", "?", "...", "😀", "123", "km")],
     ],
 )
 def test_intencao(frase, intencao):

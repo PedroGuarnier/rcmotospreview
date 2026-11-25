@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { api, mensagemDe } from "@/lib/api";
+import { ErroApi, api, mensagemDe } from "@/lib/api";
 import type { EstadoAssistente, RespostaAssistente } from "@/lib/tipos";
 import { useEu, usePode } from "../Sessao";
 import { Barras, Botao, Titulo } from "../ui";
@@ -37,6 +37,11 @@ const DICA: Record<NonNullable<EstadoAssistente["aguardando"]>, string> = {
 const LIMITE = 1000;
 const pausa = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const semMovimento = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const telaDeToque = () => window.matchMedia("(pointer: coarse)").matches;
+
+// Falha de rede ou do servidor no meio de uma confirmação: o veículo pode ter sido gravado.
+const CONFIRA_ANTES =
+  " Se você estava confirmando o cadastro, veja no Estoque se o veículo entrou antes de confirmar de novo.";
 
 function Avatar() {
   return (
@@ -127,7 +132,9 @@ export function Assistente() {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const ocupado = useRef(false); // trava o envio duplo antes mesmo de a tela redesenhar
+  const saindo = useRef(false); // a página está sendo fechada ou recarregada
   const secao = useRef<HTMLElement>(null);
+  const historico = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLTextAreaElement>(null);
 
   const { mensagens, ultima, estado } = conversa;
@@ -168,6 +175,24 @@ export function Assistente() {
     };
   }, []);
 
+  // Recarregar com um pedido no ar cancela o pedido: isso não é falta de conexão.
+  useEffect(() => {
+    const marcar = () => {
+      saindo.current = true;
+    };
+    const desmarcar = () => {
+      saindo.current = false; // a página voltou do cache do navegador
+    };
+    window.addEventListener("beforeunload", marcar);
+    window.addEventListener("pagehide", marcar);
+    window.addEventListener("pageshow", desmarcar);
+    return () => {
+      window.removeEventListener("beforeunload", marcar);
+      window.removeEventListener("pagehide", marcar);
+      window.removeEventListener("pageshow", desmarcar);
+    };
+  }, []);
+
   // O campo cresce com o texto, até um limite.
   useEffect(() => {
     const el = campo.current;
@@ -185,7 +210,8 @@ export function Assistente() {
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: suave ? "smooth" : "auto" });
   }, [mensagens.length, enviando]);
 
-  async function enviar(mensagem: string) {
+  /** `peloBotao`: o botão clicado some com a resposta, então o foco precisa de um novo lugar. */
+  async function enviar(mensagem: string, peloBotao = false) {
     const limpa = mensagem.trim();
     if (!limpa || ocupado.current) return;
     ocupado.current = true;
@@ -215,15 +241,25 @@ export function Assistente() {
         ultima: resposta,
       });
     } catch (erro) {
+      if (saindo.current) return; // a conversa guardada avisa da mensagem sem resposta
+      const recusada = erro instanceof ErroApi && erro.status >= 400 && erro.status < 500;
+      const confirmando = antes.estado?.aguardando === "confirmacao" && !recusada;
       const agora = atual();
       gravar({
         ...agora,
-        mensagens: [...agora.mensagens, { id: proximoId + 1, de: "sistema", texto: mensagemDe(erro) }],
+        mensagens: [
+          ...agora.mensagens,
+          { id: proximoId + 1, de: "sistema", texto: mensagemDe(erro) + (confirmando ? CONFIRA_ANTES : "") },
+        ],
       });
       setTexto((digitado) => digitado || limpa); // devolve o texto para tentar de novo
     } finally {
       ocupado.current = false;
       setEnviando(false);
+      if (peloBotao) {
+        // no celular, focar o campo abriria o teclado em cima da resposta
+        (telaDeToque() ? historico.current : campo.current)?.focus({ preventScroll: true });
+      }
     }
   }
 
@@ -262,7 +298,14 @@ export function Assistente() {
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6">
         <section ref={secao} aria-label="Conversa com o assistente" className="assistente">
-          <div role="log" aria-live="polite" aria-busy={enviando} className="space-y-3">
+          <div
+            ref={historico}
+            role="log"
+            aria-live="polite"
+            aria-busy={enviando}
+            tabIndex={-1}
+            className="space-y-3 outline-none"
+          >
             <Balao de="assistente">{BOAS_VINDAS}</Balao>
 
             {mensagens.length === 0 && (
@@ -316,13 +359,13 @@ export function Assistente() {
                   )}
                   {ultimaDoAssistente && pedindoConfirmacao && (
                     <div className="ml-[2.625rem] grid grid-cols-2 gap-2 pt-1 sm:flex sm:flex-wrap">
-                      <Botao onClick={() => enviar("sim")} className="col-span-2">
+                      <Botao onClick={() => enviar("sim", true)} className="col-span-2">
                         Confirmar cadastro
                       </Botao>
                       <Botao tom="neutro" onClick={focar}>
                         Corrigir
                       </Botao>
-                      <Botao tom="fantasma" onClick={() => enviar("cancela")}>
+                      <Botao tom="fantasma" onClick={() => enviar("cancela", true)}>
                         Cancelar
                       </Botao>
                     </div>
