@@ -1,3 +1,4 @@
+import enum
 import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
@@ -219,6 +220,9 @@ class VeiculoOut(BaseModel):
     situacao_desde: datetime
     dias_na_situacao: int
     foto_capa: str | None
+    # Tem laudo de procedência que vale (a mesma regra do site). Sem ele, o veículo à venda
+    # aparece no site sem laudo: a tela avisa, mas não impede.
+    laudo_valido: bool
     # Só para quem tem a permissão custos.ver
     valor_compra: Decimal | None = None
     total_custos: Decimal | None = None
@@ -537,6 +541,8 @@ class VeiculoPublico(BaseModel):
     fotos: list[FotoOut]
     dias_na_loja: int
     semaforo: Semaforo | None
+    # Última mudança no anúncio (sitemap e versão da imagem de compartilhamento)
+    atualizado_em: datetime
 
 
 class CatalogoPublico(BaseModel):
@@ -552,6 +558,55 @@ class ProcedenciaPublica(BaseModel):
     ilustrativo: bool
     itens: list[ItemLaudo]
     historico: list[MarcoHistorico]
+
+
+class TipoEventoSite(enum.StrEnum):
+    """O que o site conta: visita à página do veículo e clique no WhatsApp, pela origem."""
+
+    visualizacao = "visualizacao"
+    whatsapp_cartao = "whatsapp_cartao"  # "Quero essa" no cartão da vitrine
+    whatsapp_pagina = "whatsapp_pagina"  # "Quero essa" e botão flutuante na página do veículo
+    whatsapp_proposta = "whatsapp_proposta"  # "Monte sua proposta" com o veículo escolhido
+
+
+class EventoSite(BaseModel):
+    """Corpo de POST /publico/eventos: só o tipo e o veículo. Qualquer outro campo é recusado."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tipo: TipoEventoSite
+    veiculo_id: int = Field(ge=1, le=2_147_483_647)
+
+
+# ---------- Procura no site (área da equipe) ----------
+
+
+class NumerosProcura(BaseModel):
+    visualizacoes: int
+    cliques: int  # todos os cliques no WhatsApp
+    cliques_cartao: int
+    cliques_pagina: int
+    cliques_proposta: int
+
+
+class ProcuraVeiculo(BaseModel):
+    dias: int  # tamanho da janela de `recente`
+    recente: NumerosProcura
+    total: NumerosProcura
+
+
+class VeiculoProcurado(BaseModel):
+    id: int
+    descricao: str
+    situacao: Situacao
+    foto_capa: str | None
+    visualizacoes: int
+    cliques: int
+
+
+class MaisProcurados(BaseModel):
+    dias: int
+    veiculos: list[VeiculoProcurado]
 
 
 # ---------- Assistente (cadastro de veículo por mensagem) ----------

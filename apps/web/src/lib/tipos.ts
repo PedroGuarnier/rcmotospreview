@@ -70,6 +70,8 @@ export interface Veiculo {
   situacao_desde: string;
   dias_na_situacao: number;
   foto_capa: string | null;
+  /** tem laudo de procedência que vale (a mesma regra do site) */
+  laudo_valido: boolean;
   valor_compra: string | null;
   total_custos: string | null;
   custo_total: string | null;
@@ -291,6 +293,40 @@ export interface VeiculoPublico {
   fotos: Foto[];
   dias_na_loja: number;
   semaforo: Semaforo | null;
+  /** última mudança no anúncio (sitemap e versão da imagem de compartilhamento) */
+  atualizado_em: string;
+}
+
+/** O que o site conta (POST /publico/eventos): visita à página e clique no WhatsApp, pela origem. */
+export type TipoEventoSite = "visualizacao" | "whatsapp_cartao" | "whatsapp_pagina" | "whatsapp_proposta";
+
+export interface NumerosProcura {
+  visualizacoes: number;
+  cliques: number;
+  cliques_cartao: number;
+  cliques_pagina: number;
+  cliques_proposta: number;
+}
+
+export interface ProcuraVeiculo {
+  /** tamanho da janela de `recente` */
+  dias: number;
+  recente: NumerosProcura;
+  total: NumerosProcura;
+}
+
+export interface VeiculoProcurado {
+  id: number;
+  descricao: string;
+  situacao: Situacao;
+  foto_capa: string | null;
+  visualizacoes: number;
+  cliques: number;
+}
+
+export interface MaisProcurados {
+  dias: number;
+  veiculos: VeiculoProcurado[];
 }
 
 export interface CatalogoPublico {

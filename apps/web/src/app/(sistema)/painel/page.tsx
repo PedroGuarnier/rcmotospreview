@@ -3,11 +3,11 @@
 import Link from "next/link";
 import useSWR from "swr";
 import { GraficoMeses } from "@/components/GraficoMeses";
-import { Exigir } from "@/components/Sessao";
+import { Exigir, usePode } from "@/components/Sessao";
 import { Aviso, Carregando, Cartao, Etiqueta, Titulo } from "@/components/ui";
 import { buscar, mensagemDe } from "@/lib/api";
 import { COR_SITUACAO, SITUACAO, SITUACOES_ESTOQUE, mesLongo, moeda } from "@/lib/formato";
-import type { Painel } from "@/lib/tipos";
+import type { MaisProcurados, Painel } from "@/lib/tipos";
 
 function Numero({
   rotulo,
@@ -38,7 +38,52 @@ function Numero({
   );
 }
 
+/** Os veículos com mais cliques no WhatsApp do site (empate: mais visitas). Vê quem vê o estoque. */
+function Procurados() {
+  const { data, error } = useSWR<MaisProcurados>("/procura/mais-procurados", buscar);
+  return (
+    <Cartao className="p-5 sm:p-6">
+      <h2 className="mb-1 text-lg font-bold">Mais procurados no site</h2>
+      <p className="mb-4 text-xs text-suave">
+        Cliques no WhatsApp e visitas à página do veículo nos últimos {data?.dias ?? 30} dias.
+      </p>
+      {error ? (
+        <Aviso>{mensagemDe(error)}</Aviso>
+      ) : !data ? (
+        <Carregando />
+      ) : data.veiculos.length === 0 ? (
+        <p className="text-sm text-suave">Nenhuma visita aos anúncios do site nos últimos {data.dias} dias.</p>
+      ) : (
+        <ol className="divide-y divide-borda text-sm">
+          {data.veiculos.map((v, i) => (
+            <li key={v.id}>
+              <Link href={`/estoque/${v.id}`} className="flex items-center gap-3 py-2.5 hover:text-azul">
+                <b className="num w-4 shrink-0 text-suave">{i + 1}</b>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{v.descricao}</span>
+                  <span className="mt-0.5 block">
+                    <Etiqueta cor={COR_SITUACAO[v.situacao]}>{SITUACAO[v.situacao]}</Etiqueta>
+                  </span>
+                </span>
+                <span className="num shrink-0 text-right">
+                  <b>
+                    {v.cliques} {v.cliques === 1 ? "clique" : "cliques"}
+                  </b>
+                  <span className="block text-xs text-suave">
+                    {v.visualizacoes} {v.visualizacoes === 1 ? "visita" : "visitas"}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Cartao>
+  );
+}
+
 function Conteudo() {
+  const pode = usePode();
   // Atualiza sozinho a cada 30 s: faturamento e lucro "em tempo real".
   const { data: p, error } = useSWR<Painel>("/painel", buscar, { refreshInterval: 30_000 });
   if (error) return <Aviso>{mensagemDe(error)}</Aviso>;
@@ -169,6 +214,8 @@ function Conteudo() {
             </ul>
           )}
         </Cartao>
+
+        {pode("estoque.ver") && <Procurados />}
       </div>
     </>
   );

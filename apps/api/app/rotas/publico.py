@@ -1,22 +1,28 @@
-"""Rotas sem login, usadas pelo site: catálogo e laudo dos veículos À VENDA.
+"""Rotas sem login, usadas pelo site: catálogo e laudo dos veículos À VENDA, e a contagem de
+visitas e cliques no WhatsApp.
 
 Só sai daqui o que pode ser público: nada de valor de compra, custos, chassi, RENAVAM,
-dados de comprador ou o texto detalhado do provedor de procedência.
+dados de comprador ou o texto detalhado do provedor de procedência. E nada entra de quem
+visita: a contagem guarda só números por veículo e por dia, sem IP nem navegador.
 """
 
+import re
 import time
 from collections import defaultdict, deque
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 
 from app import fotos, schemas
 from app.config import obter_config
 from app.db import obter_db
-from app.models import LaudoProcedencia, Situacao, TipoVeiculo, Veiculo
+from app.models import ContagemSite, LaudoProcedencia, Situacao, TipoVeiculo, Veiculo
+from app.procedencia import laudo_valido
 from app.rotas.procedencia import historico_do_veiculo
+from app.tempo import hoje
 from app.validacao import normalizar_placa
 
 router = APIRouter(prefix="/publico", tags=["site público"])
@@ -30,23 +36,28 @@ _FRASE = {
     "alerta": "Restrição encontrada — fale com a loja.",
 }
 
-# Limite simples por IP para a consulta de placa (30 por minuto), em memória.
+# Limite simples por IP e por uso, em memória, numa janela de um minuto: consulta de placa
+# (30 por minuto) e contagem de visitas/cliques (120 por minuto). O IP não é gravado.
 _JANELA, _LIMITE = 60.0, 30
-_acessos: dict[str, deque[float]] = defaultdict(deque)
+_LIMITE_EVENTOS = 120
+_acessos: dict[tuple[str, str], deque[float]] = defaultdict(deque)
 
 
-def _limitar(request: Request) -> None:
+def _limitar(
+    request: Request,
+    uso: str = "placa",
+    limite: int = _LIMITE,
+    mensagem: str = "Muitas consultas. Tente de novo em um minuto.",
+) -> None:
     ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
         request.client.host if request.client else "?"
     )
     agora = time.monotonic()
-    fila = _acessos[ip]
+    fila = _acessos[(uso, ip)]
     while fila and agora - fila[0] > _JANELA:
         fila.popleft()
-    if len(fila) >= _LIMITE:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS, "Muitas consultas. Tente de novo em um minuto."
-        )
+    if len(fila) >= limite:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, mensagem)
     fila.append(agora)
     if len(_acessos) > 10_000:  # não deixa o dicionário crescer sem fim
         _acessos.clear()
@@ -56,10 +67,8 @@ def mascarar(placa: str | None) -> str | None:
     return f"{placa[:3]}•••{placa[-1]}" if placa else None
 
 
-def _laudo_valido(veiculo: Veiculo) -> LaudoProcedencia | None:
-    """Laudo mais recente. Laudo ilustrativo só aparece em ambiente de demonstração."""
-    demo = obter_config().dados_demo
-    return next((laudo for laudo in veiculo.laudos if demo or not laudo.ilustrativo), None)
+# A mesma regra vale para o aviso da área da equipe ao pôr um veículo à venda sem laudo.
+_laudo_valido = laudo_valido
 
 
 def _publico(veiculo: Veiculo) -> schemas.VeiculoPublico:
@@ -81,7 +90,17 @@ def _publico(veiculo: Veiculo) -> schemas.VeiculoPublico:
         ],
         dias_na_loja=max((datetime.now(UTC) - veiculo.situacao_desde).days, 0),
         semaforo=laudo.semaforo if laudo else None,
+        atualizado_em=_atualizado_em(veiculo, laudo),
     )
+
+
+def _atualizado_em(veiculo: Veiculo, laudo: LaudoProcedencia | None) -> datetime:
+    """Última mudança no anúncio (cadastro, etapa, fotos ou laudo): o `lastModified` do sitemap
+    e a versão da imagem de compartilhamento."""
+    datas = [veiculo.atualizado_em, veiculo.situacao_desde, *(f.criado_em for f in veiculo.fotos)]
+    if laudo is not None:
+        datas.append(laudo.criado_em)
+    return max(d for d in datas if d is not None)
 
 
 def _procedencia(veiculo: Veiculo, placa: str) -> schemas.ProcedenciaPublica:
@@ -157,3 +176,61 @@ def procedencia_pela_placa(placa: str, request: Request, db: Session = Depends(o
             status.HTTP_404_NOT_FOUND, "Esta placa não está entre os veículos à venda na loja."
         )
     return _procedencia(veiculo, placa)
+
+
+# ---------- Contagem de visitas e cliques no WhatsApp ----------
+
+_COLUNA = {
+    schemas.TipoEventoSite.visualizacao: "visualizacoes",
+    schemas.TipoEventoSite.whatsapp_cartao: "cliques_cartao",
+    schemas.TipoEventoSite.whatsapp_pagina: "cliques_pagina",
+    schemas.TipoEventoSite.whatsapp_proposta: "cliques_proposta",
+}
+
+# Robôs óbvios (buscadores, prévias de link, ferramentas de linha de comando, navegador sem
+# tela): não contam. Quem não diz o navegador também não.
+_ROBO = re.compile(
+    r"bot|crawl|spider|slurp|preview|externalhit|facebookcatalog|headless|lighthouse|"
+    r"pagespeed|curl|wget|python|httpx|aiohttp|go-http|java/|okhttp|axios|node-fetch|undici|"
+    r"scrapy|phantom|selenium|puppeteer|playwright",
+    re.IGNORECASE,
+)
+
+
+def eh_robo(user_agent: str | None) -> bool:
+    return not user_agent or not user_agent.strip() or bool(_ROBO.search(user_agent))
+
+
+@router.post("/eventos", status_code=status.HTTP_204_NO_CONTENT)
+def registrar_evento(evento: schemas.EventoSite, request: Request, db: Session = Depends(obter_db)):
+    """Soma 1 na contagem do dia do veículo: visita à página ou clique no WhatsApp.
+
+    O site chama com `navigator.sendBeacon`, sem esperar a resposta. Nada de quem visitou é
+    gravado (nem IP, nem navegador): só o número do veículo, o dia e o contador.
+    """
+    _limitar(request, "eventos", _LIMITE_EVENTOS, "Muitas contagens. Tente de novo em um minuto.")
+    if eh_robo(request.headers.get("user-agent")):
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    a_venda = db.scalar(
+        select(Veiculo.id).where(
+            Veiculo.id == evento.veiculo_id,
+            Veiculo.situacao == Situacao.a_venda,
+            Veiculo.preco_venda.is_not(None),
+        )
+    )
+    if a_venda is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Este veículo não está mais à venda.")
+    coluna = _COLUNA[evento.tipo]
+    # Soma atômica (INSERT ... ON CONFLICT): duas visitas ao mesmo tempo não se perdem.
+    # É contagem, não dado de negócio: por isso não passa pelo ORM nem pelo audit log.
+    tabela = ContagemSite.__table__
+    db.execute(
+        pg_insert(tabela)
+        .values(veiculo_id=evento.veiculo_id, dia=hoje(), **{coluna: 1})
+        .on_conflict_do_update(
+            index_elements=[tabela.c.veiculo_id, tabela.c.dia],
+            set_={coluna: tabela.c[coluna] + 1},
+        )
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

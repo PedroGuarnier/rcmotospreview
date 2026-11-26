@@ -1,41 +1,53 @@
 import type { Metadata } from "next";
 import { Site } from "@/components/site/Site";
 import { obterLoja } from "@/lib/loja";
-import type { CatalogoPublico } from "@/lib/tipos";
+import { ROBOTS_DEMONSTRACAO, carregarCatalogo, siteUrl, urlBase } from "@/lib/vitrine";
 
 // A vitrine é o estoque do sistema: a página é montada a cada visita, nunca fica velha.
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.API_URL ?? "http://localhost:8000";
-const SITE_URL = process.env.SITE_URL?.replace(/\/$/, "") || undefined;
-
-async function carregarCatalogo(): Promise<CatalogoPublico> {
-  try {
-    const resposta = await fetch(`${API_URL}/publico/veiculos`, { cache: "no-store" });
-    if (resposta.ok) return await resposta.json();
-  } catch {
-    // API fora do ar: o site abre mesmo assim, com a vitrine vazia e o WhatsApp à mão
-  }
-  return { veiculos: [], ilustrativo: false };
-}
-
-export function generateMetadata(): Metadata {
+export async function generateMetadata(): Promise<Metadata> {
   const { cidade } = obterLoja();
   const onde = cidade ? `em ${cidade}, Piauí` : "no Piauí";
   const titulo = `RC Motos — loja de motos e carros seminovos ${onde}`;
-  const descricao = `Motos e carros seminovos ${onde}: veja a vitrine com fotos e preço, confira o laudo de procedência de cada veículo e chame a loja no WhatsApp.`;
+  const descricao = `Motos e carros seminovos ${onde}: veja a vitrine com fotos e preço, consulte o laudo de procedência pela placa e chame a loja no WhatsApp.`;
+  const [base, catalogo] = await Promise.all([urlBase(), carregarCatalogo()]);
+  const canonico = siteUrl();
+  const imagens = base
+    ? [
+        {
+          url: `${base}/og/inicio`,
+          width: 1200,
+          height: 630,
+          type: "image/png",
+          alt: `RC Motos — motos e carros seminovos ${onde}`,
+        },
+      ]
+    : undefined;
   return {
     title: { absolute: titulo },
     description: descricao,
-    robots: { index: true, follow: true },
-    alternates: SITE_URL ? { canonical: SITE_URL } : undefined,
-    openGraph: { title: titulo, description: descricao, locale: "pt_BR", type: "website", url: SITE_URL },
+    // em demonstração (veículos e preços ilustrativos) nada é indexado
+    robots: catalogo?.ilustrativo ? ROBOTS_DEMONSTRACAO : { index: true, follow: true },
+    alternates: canonico ? { canonical: `${canonico}/` } : undefined,
+    openGraph: {
+      title: titulo,
+      description: descricao,
+      locale: "pt_BR",
+      type: "website",
+      siteName: "RC Motos",
+      url: base ? `${base}/` : undefined,
+      images: imagens,
+    },
+    twitter: { card: "summary_large_image", title: titulo, description: descricao, images: imagens },
   };
 }
 
 export default async function Pagina() {
   const loja = obterLoja();
-  const catalogo = await carregarCatalogo();
+  // API fora do ar: o site abre mesmo assim, com a vitrine vazia e o WhatsApp à mão
+  const catalogo = (await carregarCatalogo()) ?? { veiculos: [], ilustrativo: false };
+  const SITE_URL = siteUrl();
 
   // Dados estruturados para busca local: só o que é verdade e está configurado.
   const dadosEstruturados = {

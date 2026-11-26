@@ -65,6 +65,8 @@ services:
       LOJA_ENDERECO: ${LOJA_ENDERECO:-}
       LOJA_HORARIO: ${LOJA_HORARIO:-}
       LOJA_INSTAGRAM: ${LOJA_INSTAGRAM:-}
+      LOJA_CNPJ: ${LOJA_CNPJ:-}
+      LOJA_RAZAO_SOCIAL: ${LOJA_RAZAO_SOCIAL:-}
     ports:
       - "${WEB_PORTA:-3000}:3000"
 

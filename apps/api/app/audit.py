@@ -28,6 +28,8 @@ from app.models import (
     Venda,
 )
 
+# Só estas tabelas entram no histórico. `ContagemSite` (visitas e cliques do site) fica de fora
+# de propósito: é contagem anônima, não alteração de negócio, e encheria o histórico.
 ENTIDADES: dict[type, str] = {
     Usuario: "usuario",
     Veiculo: "veiculo",

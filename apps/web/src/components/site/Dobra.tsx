@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { moeda } from "@/lib/formato";
 import type { TipoVeiculo, VeiculoPublico } from "@/lib/tipos";
+import { Abrindo } from "./Abrindo";
 import { caminhoVeiculo, caminhoVitrine, chegouEstaSemana, fichaVeiculo, nomeVeiculo } from "./anuncio";
 import { Barras, Capa, Preco } from "./pecas";
 
@@ -14,6 +15,7 @@ function Destaque({ veiculo }: { veiculo: VeiculoPublico }) {
     .join(", ");
   return (
     <Link href={caminhoVeiculo(veiculo)} prefetch={false} className="destaque" aria-label={rotulo}>
+      <Abrindo />
       <span className="destaque__midia">
         <Capa veiculo={veiculo} urgente />
         {chegou && <span className="etiqueta">Chegou esta semana</span>}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LaudoVisual } from "@/components/placa/Laudo";
 import { numero } from "@/lib/formato";
 import type { Loja } from "@/lib/loja";
@@ -16,6 +16,7 @@ import {
   queroEsse,
 } from "./anuncio";
 import { Cartao } from "./Cartao";
+import { contarClique, contarVisita } from "./contagem";
 import { Galeria } from "./Galeria";
 import { Moldura } from "./Moldura";
 import { Barras, Capa, Preco, SeloLaudo } from "./pecas";
@@ -43,6 +44,10 @@ export function Produto({
   const [atual, setAtual] = useState(0);
   const [aberta, setAberta] = useState<number | null>(null);
   const fechar = useCallback(() => setAberta(null), []);
+  const contarZap = useCallback(() => contarClique(veiculo.id, "pagina"), [veiculo.id]);
+
+  // conta a visita ao anúncio (uma vez por aba; robô que não roda JavaScript não conta)
+  useEffect(() => contarVisita(veiculo.id), [veiculo.id]);
 
   const nome = nomeVeiculo(veiculo);
   const fotos = veiculo.fotos;
@@ -64,7 +69,7 @@ export function Produto({
   }
 
   return (
-    <Moldura loja={loja} linkZap={linkQuero}>
+    <Moldura loja={loja} linkZap={linkQuero} aoClicarZap={contarZap}>
       <article className="claro produto" aria-labelledby="titulo-veiculo">
         <nav className="trilha" aria-label="Você está em">
           <Link href={caminhoVitrine()}>Vitrine</Link>
@@ -153,7 +158,7 @@ export function Produto({
             </dl>
 
             <div className="produto__acoes" data-sem-zap>
-              <a className="acao acao--tinta" href={linkQuero} target="_blank" rel="noopener">
+              <a className="acao acao--tinta" href={linkQuero} target="_blank" rel="noopener" onClick={contarZap}>
                 {queroEsse(veiculo.tipo)}
               </a>
               <Link className="acao acao--linha acao--sem-seta" href={`/?veiculo=${veiculo.id}#pagamento`}>
@@ -169,6 +174,12 @@ export function Produto({
                 </span>
               </a>
             )}
+            {laudo && !laudo.semaforo && (
+              // sem laudo, o anúncio não promete: diz que ainda não foi feito
+              <p className="produto__sem-laudo">
+                A consulta de procedência deste veículo ainda não foi feita. Quer saber mais? Pergunte à loja.
+              </p>
+            )}
             {ilustrativo && (
               <p className="dado vitrine__nota">Ambiente de demonstração: veículo, preço e laudo ilustrativos.</p>
             )}
@@ -176,7 +187,7 @@ export function Produto({
         </div>
       </article>
 
-      {laudo && (
+      {laudo?.semaforo && (
         <section id="laudo" className="laudo-anuncio" aria-labelledby="titulo-laudo">
           <div className="laudo-anuncio__grade">
             <div>
@@ -194,11 +205,9 @@ export function Produto({
             <LaudoVisual
               semaforo={laudo.semaforo}
               itens={laudo.itens}
-              // sem laudo anexado, a linha do tempo ficaria com um marco só: fica só o aviso
-              historico={laudo.semaforo ? laudo.historico : []}
+              historico={laudo.historico}
               consultadoEm={laudo.consultado_em}
               ilustrativo={laudo.ilustrativo}
-              semLaudo="A consulta deste veículo ainda não foi anexada. Peça o laudo para a loja."
             />
           </div>
         </section>

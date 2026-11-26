@@ -48,10 +48,16 @@ function CartaoVeiculo({ v, aoVender }: { v: Veiculo; aoVender?: () => void }) {
           ) : (
             <div className="grid size-full place-items-center text-sm text-suave">Sem foto</div>
           )}
-          <span className="absolute left-3 top-3">
+          <span className="absolute left-3 top-3 flex flex-wrap gap-1.5">
             <Etiqueta sobreFoto cor={COR_SITUACAO[v.situacao]}>
               {SITUACAO[v.situacao]}
             </Etiqueta>
+            {/* à venda sem laudo: vai para o site sem laudo (permitido, mas a equipe vê) */}
+            {v.situacao === "a_venda" && !v.laudo_valido && (
+              <Etiqueta sobreFoto cor="laranja">
+                Sem laudo
+              </Etiqueta>
+            )}
           </span>
         </div>
         <div className="px-4 pt-3">

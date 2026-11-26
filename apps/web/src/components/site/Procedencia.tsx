@@ -7,6 +7,7 @@ import { LaudoVisual } from "@/components/placa/Laudo";
 import { type FormatoPlaca, PlacaMercosul, placaCompleta } from "@/components/placa/PlacaMercosul";
 import type { ProcedenciaPublica } from "@/lib/tipos";
 import { caminhoVeiculo, fichaVeiculo, linkVeiculo, nomeVeiculo, queroEsse } from "./anuncio";
+import { contarClique } from "./contagem";
 import { Barras, Preco } from "./pecas";
 
 type Estado =
@@ -21,8 +22,9 @@ const pausa = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const semMovimento = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * A procedência como garantia da loja: o que é conferido em cada veículo e a consulta pela placa.
- * O laudo de cada anúncio aparece na página dele; aqui é para quem tem a placa em mãos.
+ * A procedência: o que a consulta pela placa confere e a consulta para quem tem a placa em mãos.
+ * O laudo de cada anúncio aparece na página dele quando a loja já fez a consulta — nem todo
+ * veículo tem (pôr à venda sem laudo é permitido), então o texto não promete que todos têm.
  */
 export function Procedencia({ whatsapp, linkLoja }: { whatsapp: string | null; linkLoja: string }) {
   const [placa, setPlaca] = useState("");
@@ -83,11 +85,11 @@ export function Procedencia({ whatsapp, linkLoja }: { whatsapp: string | null; l
             <Barras /> Procedência
           </p>
           <h2 id="titulo-procedencia" className="outdoor garantia__titulo" data-revelar>
-            Veículo da vitrine <em>tem laudo.</em>
+            Consulte o laudo <em>pela placa.</em>
           </h2>
           <p className="garantia__texto" data-revelar>
-            Todo veículo passa por consulta pela placa antes de ir à venda. O resultado fica na página de cada
-            anúncio, para você ver antes de sair de casa.
+            A consulta de procedência confere a placa nas bases abaixo. Cada anúncio mostra o laudo quando ele já foi
+            feito; se tiver a placa de um veículo da loja, confira aqui.
           </p>
           <ul className="garantia__itens" data-revelar>
             {CONFERIDOS.map((item) => (
@@ -147,7 +149,7 @@ export function Procedencia({ whatsapp, linkLoja }: { whatsapp: string | null; l
               historico={estado.laudo.historico}
               consultadoEm={estado.laudo.consultado_em}
               ilustrativo={estado.laudo.ilustrativo}
-              semLaudo="A consulta deste veículo ainda não foi anexada. Peça o laudo para a loja."
+              semLaudo="A loja ainda não fez a consulta de procedência deste veículo. Pergunte no WhatsApp."
             />
             <div className="garantia__fecho">
               <Link className="acao" href={caminhoVeiculo(estado.laudo.veiculo)} prefetch={false}>
@@ -158,6 +160,7 @@ export function Procedencia({ whatsapp, linkLoja }: { whatsapp: string | null; l
                 href={linkVeiculo(whatsapp, estado.laudo.veiculo)}
                 target="_blank"
                 rel="noopener"
+                onClick={() => contarClique(estado.laudo.veiculo.id, "cartao")}
               >
                 {queroEsse(estado.laudo.veiculo.tipo)}
               </a>

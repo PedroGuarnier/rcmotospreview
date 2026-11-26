@@ -37,7 +37,7 @@ import {
   placa,
   valorParaApi,
 } from "@/lib/formato";
-import type { Evento, Laudo, Situacao, TipoCusto, VeiculoDetalhe } from "@/lib/tipos";
+import type { Evento, Laudo, ProcuraVeiculo, Situacao, TipoCusto, VeiculoDetalhe } from "@/lib/tipos";
 
 function Dado({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -391,6 +391,89 @@ function Procedencia({ v }: { v: VeiculoDetalhe }) {
   );
 }
 
+/**
+ * Pôr à venda sem laudo é permitido (a loja pode estar sem crédito no provedor), mas o veículo
+ * vai para o site sem laudo: a tela avisa e oferece o atalho para consultar.
+ */
+function AvisoSemLaudo({ v }: { v: VeiculoDetalhe }) {
+  const pode = usePode();
+  if (v.situacao !== "a_venda" || v.laudo_valido) return null;
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl bg-amarelo/25 px-4 py-3 text-sm"
+    >
+      <p className="min-w-0 flex-1 basis-64 font-medium">
+        Este veículo ainda não tem laudo de procedência. Ele vai para o site sem laudo.
+      </p>
+      {pode("procedencia.consultar") &&
+        (v.placa ? (
+          <Link
+            href={`/procedencia?placa=${v.placa}`}
+            className="inline-flex min-h-9 shrink-0 items-center rounded-full bg-tinta px-3.5 font-semibold text-white hover:bg-azul"
+          >
+            Consultar pela placa
+          </Link>
+        ) : (
+          <span className="text-suave">Cadastre a placa para consultar.</span>
+        ))}
+    </div>
+  );
+}
+
+/** Visitas ao anúncio do site e cliques no WhatsApp (contagem sem dado de quem visitou). */
+function ProcuraNoSite({ v }: { v: VeiculoDetalhe }) {
+  const { data, error } = useSWR<ProcuraVeiculo>(`/procura/veiculos/${v.id}`, buscar);
+  const origens = (n: ProcuraVeiculo["recente"]) =>
+    [
+      n.cliques_cartao && `${numero(n.cliques_cartao)} no cartão da vitrine`,
+      n.cliques_pagina && `${numero(n.cliques_pagina)} na página do veículo`,
+      n.cliques_proposta && `${numero(n.cliques_proposta)} em propostas`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  return (
+    <Secao titulo="Procura no site">
+      {error ? (
+        <Aviso>{mensagemDe(error)}</Aviso>
+      ) : !data ? (
+        <Carregando />
+      ) : (
+        <>
+          <dl className="grid grid-cols-2 gap-3">
+            {(
+              [
+                ["Visualizações", data.recente.visualizacoes, data.total.visualizacoes],
+                ["Cliques no WhatsApp", data.recente.cliques, data.total.cliques],
+              ] as const
+            ).map(([rotulo, recente, total]) => (
+              <div key={rotulo} className="rounded-xl bg-gelo px-4 py-3">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-suave">{rotulo}</dt>
+                <dd className="mt-1">
+                  <span className="num text-2xl font-bold">{numero(recente)}</span>
+                  <span className="block text-xs text-suave">
+                    últimos {data.dias} dias · {numero(total)} no total
+                  </span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {origens(data.recente) && (
+            <p className="mt-3 text-xs text-suave">Cliques nos últimos {data.dias} dias: {origens(data.recente)}.</p>
+          )}
+          {data.total.visualizacoes === 0 && data.total.cliques === 0 && (
+            <p className="mt-3 text-xs text-suave">
+              {v.situacao === "a_venda"
+                ? "Ninguém abriu o anúncio no site ainda."
+                : "O veículo só aparece no site enquanto está à venda."}
+            </p>
+          )}
+        </>
+      )}
+    </Secao>
+  );
+}
+
 function Veiculo() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -503,8 +586,9 @@ function Veiculo() {
                 </button>
               ))}
             </div>
-            <div className="mt-3">
+            <div className="mt-3 space-y-3 empty:hidden">
               <Aviso>{situacao.erro}</Aviso>
+              <AvisoSemLaudo v={v} />
             </div>
           </Secao>
         )}
@@ -528,6 +612,8 @@ function Veiculo() {
         </Secao>
 
         <Procedencia v={v} />
+
+        <ProcuraNoSite v={v} />
 
         <Custos v={v} aoMudar={atualizar} />
 

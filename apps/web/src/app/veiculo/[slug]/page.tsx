@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 import {
   anoVeiculo,
   caminhoVeiculo,
@@ -12,27 +11,15 @@ import {
 import { Produto } from "@/components/site/Produto";
 import { numero } from "@/lib/formato";
 import { obterLoja } from "@/lib/loja";
-import type { CatalogoPublico, ProcedenciaPublica, VeiculoPublico } from "@/lib/tipos";
+import type { ProcedenciaPublica } from "@/lib/tipos";
+import { API_URL, ROBOTS_DEMONSTRACAO, carregarCatalogo, carregarVeiculo, siteUrl, urlBase } from "@/lib/vitrine";
 
 // O anúncio é o estoque do sistema: a página é montada a cada visita, nunca fica velha.
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.API_URL ?? "http://localhost:8000";
-const SITE_URL = process.env.SITE_URL?.replace(/\/$/, "") || undefined;
 const OUTROS = 3;
 
 type Parametros = { params: Promise<{ slug: string }> };
-
-/**
- * O veículo, se ainda estiver à venda. `null` = fora da vitrine (vendido, retirado ou nunca existiu).
- * Com `cache`, a metadata e a página dividem a mesma consulta.
- */
-const carregarVeiculo = cache(async (id: number): Promise<VeiculoPublico | null> => {
-  const resposta = await fetch(`${API_URL}/publico/veiculos/${id}`, { cache: "no-store" });
-  if (resposta.status === 404) return null;
-  if (!resposta.ok) throw new Error(`A vitrine respondeu ${resposta.status}`);
-  return resposta.json();
-});
 
 /** O que complementa a página; se falhar, o anúncio abre sem esse bloco. */
 async function carregarExtra<T>(caminho: string): Promise<T | null> {
@@ -46,7 +33,7 @@ async function carregarExtra<T>(caminho: string): Promise<T | null> {
 
 export async function generateMetadata({ params }: Parametros): Promise<Metadata> {
   const id = idDoSlug((await params).slug);
-  let veiculo: VeiculoPublico | null = null;
+  let veiculo = null;
   if (id !== null) {
     try {
       veiculo = await carregarVeiculo(id);
@@ -58,6 +45,7 @@ export async function generateMetadata({ params }: Parametros): Promise<Metadata
   if (!veiculo) return {}; // fora da vitrine: vale a metadata de reserva de ../layout.tsx
 
   const { cidade } = obterLoja();
+  const [base, catalogo] = await Promise.all([urlBase(), carregarCatalogo()]);
   const titulo = `${nomeComAno(veiculo)} — RC Motos${cidade ? `, ${cidade}` : ""}`;
   const detalhes = [
     nomeVeiculo(veiculo),
@@ -65,25 +53,46 @@ export async function generateMetadata({ params }: Parametros): Promise<Metadata
     veiculo.km !== null ? `${numero(veiculo.km)} km` : null,
     veiculo.cor?.toLowerCase(),
   ].filter(Boolean);
+  // só fala das fotos e do laudo que o anúncio tem
+  const ver = [veiculo.fotos.length > 0 && "as fotos", veiculo.semaforo && "o laudo de procedência"].filter(Boolean);
+  const convite = ver.length
+    ? `Veja ${ver.join(" e ")} e chame a loja no WhatsApp.`
+    : "Chame a loja no WhatsApp.";
   const descricao = `${detalhes.join(", ")}, por R$ ${precoVeiculo(veiculo.preco)} na RC Motos${
     cidade ? ` em ${cidade}, Piauí` : ""
-  }. Veja as fotos e o laudo de procedência e chame a loja no WhatsApp.`;
-  const endereco = SITE_URL ? `${SITE_URL}${caminhoVeiculo(veiculo)}` : undefined;
-  const capa = SITE_URL && veiculo.fotos[0] ? `${SITE_URL}${veiculo.fotos[0].url}` : undefined;
+  }. ${convite}`;
+  const canonico = siteUrl();
+  const capa = veiculo.fotos[0];
+  // com foto, a prévia do link é a foto de capa; sem foto, um pôster com nome, ano, km e preço
+  const imagens = !base
+    ? undefined
+    : capa
+      ? [{ url: `${base}${capa.url}`, alt: nomeComAno(veiculo) }]
+      : [
+          {
+            url: `${base}/og/veiculo/${veiculo.id}?v=${encodeURIComponent(veiculo.atualizado_em)}`,
+            width: 1200,
+            height: 630,
+            type: "image/png",
+            alt: nomeComAno(veiculo),
+          },
+        ];
 
   return {
     title: { absolute: titulo },
     description: descricao,
-    robots: { index: true, follow: true },
-    alternates: endereco ? { canonical: endereco } : undefined,
+    robots: catalogo?.ilustrativo ? ROBOTS_DEMONSTRACAO : { index: true, follow: true },
+    alternates: canonico ? { canonical: `${canonico}${caminhoVeiculo(veiculo)}` } : undefined,
     openGraph: {
       title: titulo,
       description: descricao,
       locale: "pt_BR",
       type: "website",
-      url: endereco,
-      images: capa ? [{ url: capa, alt: nomeComAno(veiculo) }] : undefined,
+      siteName: "RC Motos",
+      url: base ? `${base}${caminhoVeiculo(veiculo)}` : undefined,
+      images: imagens,
     },
+    twitter: { card: "summary_large_image", title: titulo, description: descricao, images: imagens },
   };
 }
 
@@ -96,8 +105,9 @@ export default async function Pagina({ params }: Parametros) {
   const loja = obterLoja();
   const [laudo, catalogo] = await Promise.all([
     carregarExtra<ProcedenciaPublica>(`/publico/veiculos/${id}/procedencia`),
-    carregarExtra<CatalogoPublico>("/publico/veiculos"),
+    carregarCatalogo(),
   ]);
+  const SITE_URL = siteUrl();
   // outros anúncios: primeiro os do mesmo tipo, sempre do mais novo para o mais antigo
   const demais = (catalogo?.veiculos ?? []).filter((v) => v.id !== veiculo.id);
   const outros = [

@@ -34,6 +34,7 @@ _CARGA = (
     selectinload(Veiculo.fotos),
     selectinload(Veiculo.vendas).selectinload(Venda.cliente),
     selectinload(Veiculo.vendas).selectinload(Venda.vendedor),
+    selectinload(Veiculo.laudos),
 )
 
 
@@ -65,6 +66,7 @@ def _resumo(veiculo: Veiculo, com_custos: bool) -> dict:
         "situacao_desde": veiculo.situacao_desde,
         "dias_na_situacao": max(dias, 0),
         "foto_capa": fotos.url(veiculo.fotos[0].miniatura) if veiculo.fotos else None,
+        "laudo_valido": procedencia.laudo_valido(veiculo) is not None,
     }
     if com_custos:
         dados["valor_compra"] = veiculo.valor_compra

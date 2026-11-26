@@ -136,7 +136,9 @@ def test_pagina_do_produto_so_para_veiculo_a_venda(anonimo, dono, demonstracao):
 
     resposta = anonimo.get(f"/publico/veiculos/{v['id']}")
     assert resposta.status_code == 200
-    assert resposta.json() == {
+    corpo = resposta.json()
+    assert corpo.pop("atualizado_em")  # data da última mudança no anúncio (sitemap)
+    assert corpo == {
         "id": v["id"],
         "tipo": "moto",
         "marca": "Honda",

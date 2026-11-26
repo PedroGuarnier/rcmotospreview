@@ -5,6 +5,7 @@ import { moeda, valorParaApi, valorParaCampo } from "@/lib/formato";
 import { linkWhats } from "@/lib/loja";
 import type { VeiculoPublico } from "@/lib/tipos";
 import { nomeComAno } from "./anuncio";
+import { contarClique } from "./contagem";
 import { Barras } from "./pecas";
 
 const FORMAS = [
@@ -88,6 +89,7 @@ export function Pagamento({
           data-sem-zap
           onSubmit={(e) => {
             e.preventDefault();
+            if (veiculo) contarClique(veiculo.id, "proposta"); // só conta proposta de um veículo
             window.open(linkWhats(whatsapp, mensagem), "_blank", "noopener");
           }}
         >

@@ -56,7 +56,7 @@ export function LaudoVisual({
       <div className="laudo__veredito">
         <Semaforo cor={semaforo} tamanho="clamp(1.5rem, 4vw, 2.1rem)" />
         <div>
-          <p className="laudo__titulo">{veredito ? veredito.titulo : "Laudo em preparação"}</p>
+          <p className="laudo__titulo">{veredito ? veredito.titulo : "Ainda sem laudo"}</p>
           <p className="laudo__sub">
             {veredito ? veredito.frase : (semLaudo ?? "A consulta deste veículo ainda não foi anexada.")}
             {consultadoEm && <> Consulta de {data(consultadoEm)}.</>}

@@ -60,6 +60,14 @@ def classificar(itens: list[dict]) -> Semaforo:
     return Semaforo.verde
 
 
+def laudo_valido(veiculo: Veiculo) -> LaudoProcedencia | None:
+    """Laudo que vale para o veículo: o mais recente. Laudo ilustrativo só vale em ambiente de
+    demonstração. É a regra do site (o anúncio mostra este laudo) e do aviso da área da equipe
+    ao pôr um veículo à venda sem laudo."""
+    demo = obter_config().dados_demo
+    return next((laudo for laudo in veiculo.laudos if demo or not laudo.ilustrativo), None)
+
+
 def _demonstracao(placa: str, veiculo: Veiculo | None) -> dict:
     """Dados ilustrativos. Placas terminadas em 3 mostram atenção; em 7, alerta."""
     final = placa[-1]

@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import type { VeiculoPublico } from "@/lib/tipos";
+import { Abrindo } from "./Abrindo";
 import { caminhoVeiculo, chegouEstaSemana, fichaVeiculo, linkVeiculo, nomeVeiculo, queroEsse } from "./anuncio";
+import { contarClique } from "./contagem";
 import { Capa, Preco, SeloLaudo } from "./pecas";
 
 /**
@@ -29,6 +33,7 @@ export function Cartao({
         <h3 className="outdoor cartao__nome">
           <Link href={caminhoVeiculo(veiculo)} prefetch={false}>
             {nomeVeiculo(veiculo)}
+            <Abrindo />
           </Link>
         </h3>
         {ficha.length > 0 && (
@@ -47,6 +52,7 @@ export function Cartao({
               href={linkVeiculo(whatsapp, veiculo)}
               target="_blank"
               rel="noopener"
+              onClick={() => contarClique(veiculo.id, "cartao")}
               aria-label={`${queroEsse(veiculo.tipo)}: ${nomeVeiculo(veiculo)} (abre o WhatsApp)`}
             >
               {queroEsse(veiculo.tipo)}

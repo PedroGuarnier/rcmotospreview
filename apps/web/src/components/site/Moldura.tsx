@@ -79,6 +79,7 @@ export function Moldura({
   loja,
   inicio = false,
   linkZap,
+  aoClicarZap,
   children,
 }: {
   loja: Loja;
@@ -86,6 +87,8 @@ export function Moldura({
   inicio?: boolean;
   /** conversa do botão flutuante (na página de um veículo, já fala dele) */
   linkZap?: string;
+  /** clique no botão flutuante (na página de um veículo, entra na contagem de cliques) */
+  aoClicarZap?: () => void;
   children: React.ReactNode;
 }) {
   const raiz = useRef<HTMLDivElement>(null);
@@ -227,15 +230,26 @@ export function Moldura({
           <p className="outdoor">Deus é fiel.</p>
         </div>
         <div className="rodape__base">
-          <p>
-            © {new Date().getFullYear()} RC Motos · {local}
-          </p>
+          <div className="rodape__empresa">
+            <p>
+              © {new Date().getFullYear()} RC Motos · {local}
+            </p>
+            {/* só o que a loja configurou (LOJA_RAZAO_SOCIAL, LOJA_CNPJ): nada é inventado */}
+            {(loja.razaoSocial || loja.cnpj) && (
+              <p>
+                {loja.razaoSocial}
+                {loja.razaoSocial && loja.cnpj && " · "}
+                {loja.cnpj && <span className="rodape__cnpj">CNPJ {loja.cnpj}</span>}
+              </p>
+            )}
+          </div>
           <nav aria-label="Rodapé">
             {SECOES.map((s) => (
               <Secao key={s.id} id={s.id} inicio={inicio}>
                 {s.rotulo}
               </Secao>
             ))}
+            <Link href="/privacidade">Privacidade</Link>
             <a href="/login">Área da equipe</a>
           </nav>
         </div>
@@ -246,6 +260,7 @@ export function Moldura({
         href={linkZap ?? linkLoja}
         target="_blank"
         rel="noopener"
+        onClick={aoClicarZap}
         data-oculto={zapOculto || gaveta}
       >
         <IconeZap />

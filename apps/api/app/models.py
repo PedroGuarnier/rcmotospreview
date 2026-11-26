@@ -398,6 +398,28 @@ class LaudoProcedencia(Base):
     consultado_por: Mapped[Usuario | None] = relationship()
 
 
+class ContagemSite(Base):
+    """Visitas e cliques no WhatsApp do site, somados por veículo e por dia.
+
+    Só números: nada de IP, navegador ou qualquer outro dado de quem visitou. Fica fora do
+    audit log de propósito (`app/audit.py` só registra as tabelas de `ENTIDADES`): é contagem,
+    não alteração de negócio. Origem do clique: cartão da vitrine, página do veículo ou
+    "Monte sua proposta".
+    """
+
+    __tablename__ = "contagem_site"
+    __table_args__ = (Index("ix_contagem_site_dia", "dia"),)
+
+    veiculo_id: Mapped[int] = mapped_column(
+        ForeignKey("veiculos.id", ondelete="CASCADE"), primary_key=True
+    )
+    dia: Mapped[date] = mapped_column(Date, primary_key=True)  # no fuso da loja
+    visualizacoes: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    cliques_cartao: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    cliques_pagina: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    cliques_proposta: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+
+
 class AuditLog(Base):
     """Histórico de ações: quem, quando, o quê. Só inserção — nunca é alterado."""
 
