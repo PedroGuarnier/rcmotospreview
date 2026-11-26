@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app import assistente, schemas
+from app import schemas
 from app.db import obter_db
+from app.ia import atendimento
+from app.ia.provedores import Provedor, provedor_ia
 from app.models import Usuario
-from app.permissoes import P, exigir
+from app.permissoes import usuario_atual
 
 router = APIRouter(prefix="/assistente", tags=["assistente"])
 
@@ -12,8 +14,11 @@ router = APIRouter(prefix="/assistente", tags=["assistente"])
 @router.post("/mensagem", response_model=schemas.AssistenteResposta)
 def mensagem(
     dados: schemas.AssistenteMensagem,
-    usuario: Usuario = Depends(exigir(P.estoque_editar)),  # a mesma do formulário de cadastro
+    # Cadastro exige estoque.editar (a mesma do formulário); perguntas, qualquer perfil
+    # com a IA ligada. Quem decide é `atendimento.atender`.
+    usuario: Usuario = Depends(usuario_atual),
     db: Session = Depends(obter_db),
+    provedor: Provedor | None = Depends(provedor_ia),
 ):
-    """Uma rodada da conversa de cadastro. O `estado` devolvido volta na mensagem seguinte."""
-    return assistente.conversar(db, usuario, dados.mensagem, dados.estado)
+    """Uma rodada da conversa. O `estado` devolvido volta na mensagem seguinte."""
+    return atendimento.atender(db, usuario, dados.mensagem, dados.estado, provedor)

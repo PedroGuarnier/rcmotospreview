@@ -14,6 +14,8 @@ export interface Mensagem {
   veiculo?: VeiculoCriadoAssistente | null;
   /** resposta que encontrou a placa ou o chassi em outro veículo */
   duplicado?: DuplicadoAssistente | null;
+  /** resposta da IA (pergunta sobre o negócio): o balão ganha um rótulo */
+  ia?: boolean;
 }
 
 export interface Conversa {

@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,6 +42,19 @@ class Config(BaseSettings):
 
     # Quando true, a interface avisa que os números são ilustrativos (dados do seed --demo).
     dados_demo: bool = False
+
+    # IA do assistente (perguntas sobre vendas, estoque e financeiro). Sem a chave do provedor
+    # escolhido, fica desligada: o assistente continua cadastrando e avisa que as perguntas
+    # não estão ligadas.
+    ia_provedor: Literal["groq", "anthropic"] = "groq"
+    groq_api_key: str = ""
+    anthropic_api_key: str = ""
+    ia_modelo: str = ""  # vazio = o padrão do provedor (app/ia/provedores.py)
+
+    @field_validator("ia_provedor", mode="before")
+    @classmethod
+    def _provedor_vazio_usa_padrao(cls, valor: str | None) -> str:
+        return (valor or "groq").strip().lower()
 
     @field_validator("segredo_jwt", mode="before")
     @classmethod

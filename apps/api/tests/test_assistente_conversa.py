@@ -75,7 +75,11 @@ def test_frase_completa_confirma_e_cria(dono, db):
         "descricao": "Honda CG 160 Fan 2022 (ABC1D23)",
         "placa": "ABC1D23",
     }
-    assert r["estado"] == {"rascunho": conversa.estado["rascunho"], "aguardando": None}
+    assert r["estado"] == {
+        "rascunho": conversa.estado["rascunho"],
+        "aguardando": None,
+        "historico": [],
+    }
     assert all(valor is None for valor in r["estado"]["rascunho"].values())
     assert r["ficha"] == []
     assert "fotos" in r["resposta"] and "procedência" in r["resposta"]

@@ -8,6 +8,7 @@ from app import schemas
 from app.audit import registrar_evento
 from app.config import obter_config
 from app.db import obter_db
+from app.ia.provedores import ia_ligada
 from app.models import Usuario
 from app.permissoes import permissoes_de, usuario_atual
 from app.security import conferir_senha, criar_token, gerar_hash
@@ -20,6 +21,7 @@ def _eu(usuario: Usuario) -> schemas.EuOut:
         **schemas.UsuarioOut.model_validate(usuario).model_dump(),
         permissoes=sorted(permissoes_de(usuario)),
         dados_demo=obter_config().dados_demo,
+        ia_ligada=ia_ligada(),
     )
 
 

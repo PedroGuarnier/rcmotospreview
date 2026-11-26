@@ -47,6 +47,8 @@ export interface Usuario {
 export interface Eu extends Usuario {
   permissoes: Permissao[];
   dados_demo: boolean;
+  /** o assistente responde perguntas sobre vendas, estoque e financeiro */
+  ia_ligada: boolean;
 }
 
 export interface PessoaRef {
@@ -364,9 +366,17 @@ export interface RascunhoAssistente {
   observacoes: string | null;
 }
 
+/** Uma pergunta respondida pela IA, guardada para perguntas de seguimento ("e em setembro?"). */
+export interface TrocaAssistente {
+  pergunta: string;
+  resposta: string;
+}
+
 /** Vai e volta a cada mensagem: o servidor não guarda a conversa. */
 export interface EstadoAssistente {
   rascunho: RascunhoAssistente;
+  /** últimas trocas com a IA (no máximo 6), só texto */
+  historico: TrocaAssistente[];
   /** campo que o assistente acabou de perguntar, ou "confirmacao" */
   aguardando:
     | "tipo"
@@ -424,4 +434,6 @@ export interface RespostaAssistente {
   duplicado: DuplicadoAssistente | null;
   /** suposições feitas ("Considerei 2022 como ano de fabricação e do modelo.") */
   avisos: string[];
+  /** "ia": resposta de pergunta sobre o negócio */
+  origem: "regras" | "ia";
 }

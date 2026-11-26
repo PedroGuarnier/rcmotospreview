@@ -17,10 +17,30 @@ const EXEMPLOS = [
   "fiat uno way 1.0 2015 prata, 98.000 km, compra R$ 24.000, venda R$ 31.900",
 ];
 
-const BOAS_VINDAS =
-  "Olá! Eu cadastro veículo novo no estoque por mensagem.\n" +
-  "Escreva os dados do jeito que você fala, em qualquer ordem, e eu monto a ficha. " +
-  "Antes de gravar eu mostro tudo e peço a sua confirmação.";
+// Perguntas sobre o negócio (com a IA ligada): um toque envia.
+const PERGUNTAS = [
+  "Quantas motos vendemos este mês?",
+  "Qual foi o faturamento do mês passado?",
+  "O que está parado há mais de 30 dias?",
+  "Como estão as comissões deste mês?",
+];
+
+function boasVindas(cadastra: boolean, ia: boolean): string {
+  if (!cadastra) {
+    return (
+      "Olá! Eu respondo perguntas sobre vendas, estoque e comissões com os dados do sistema, " +
+      "dentro do que o seu perfil pode ver."
+    );
+  }
+  return (
+    (ia
+      ? "Olá! Eu cadastro veículo novo no estoque por mensagem e respondo perguntas sobre vendas, " +
+        "estoque e financeiro.\n"
+      : "Olá! Eu cadastro veículo novo no estoque por mensagem.\n") +
+    "Para cadastrar, escreva os dados do jeito que você fala, em qualquer ordem, e eu monto a ficha. " +
+    "Antes de gravar eu mostro tudo e peço a sua confirmação."
+  );
+}
 
 // O campo de texto lembra o que o assistente acabou de perguntar.
 const DICA: Record<NonNullable<EstadoAssistente["aguardando"]>, string> = {
@@ -53,7 +73,7 @@ function Avatar() {
   );
 }
 
-function Balao({ de, children }: { de: Mensagem["de"]; children: React.ReactNode }) {
+function Balao({ de, ia, children }: { de: Mensagem["de"]; ia?: boolean; children: React.ReactNode }) {
   if (de === "voce") {
     return (
       <div className="flex justify-end">
@@ -76,6 +96,11 @@ function Balao({ de, children }: { de: Mensagem["de"]; children: React.ReactNode
       <Avatar />
       <div className="entrar min-w-0 max-w-[85%] whitespace-pre-line break-words rounded-2xl rounded-tl-md border border-borda bg-white px-4 py-2.5 text-[15px] leading-relaxed sm:max-w-xl">
         <span className="sr-only">Assistente: </span>
+        {ia && (
+          <span className="mb-0.5 block text-[11px] font-bold uppercase tracking-wider text-suave">
+            Consulta ao sistema · IA
+          </span>
+        )}
         {children}
       </div>
     </div>
@@ -128,6 +153,8 @@ function Criado({
 
 export function Assistente() {
   const eu = useEu();
+  const pode = usePode();
+  const cadastra = pode("estoque.editar"); // sem isso, o assistente é só de perguntas (com a IA)
   const { conversa, atual, gravar, limpar } = useConversa(eu.id);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -235,6 +262,7 @@ export function Assistente() {
             texto: resposta.resposta,
             veiculo: resposta.veiculo,
             duplicado: resposta.duplicado,
+            ia: resposta.origem === "ia",
           },
         ],
         estado: resposta.estado,
@@ -284,7 +312,13 @@ export function Assistente() {
   return (
     <>
       <Titulo
-        sobre="Cadastre um veículo por mensagem"
+        sobre={
+          !cadastra
+            ? "Pergunte sobre vendas, estoque e comissões"
+            : eu.ia_ligada
+              ? "Cadastre veículos e pergunte sobre o negócio"
+              : "Cadastre um veículo por mensagem"
+        }
         acoes={
           mensagens.length > 0 && (
             <Botao tom="neutro" pequeno onClick={novaConversa} disabled={enviando}>
@@ -296,7 +330,7 @@ export function Assistente() {
         Assistente
       </Titulo>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6">
+      <div className={cadastra ? "lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6" : ""}>
         <section ref={secao} aria-label="Conversa com o assistente" className="assistente">
           <div
             ref={historico}
@@ -306,9 +340,30 @@ export function Assistente() {
             tabIndex={-1}
             className="space-y-3 outline-none"
           >
-            <Balao de="assistente">{BOAS_VINDAS}</Balao>
+            <Balao de="assistente">{boasVindas(cadastra, eu.ia_ligada)}</Balao>
 
-            {mensagens.length === 0 && (
+            {mensagens.length === 0 && eu.ia_ligada && (
+              <div className="ml-[2.625rem]">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-suave">
+                  Perguntas — toque para enviar
+                </p>
+                <ul className="flex flex-wrap gap-2">
+                  {PERGUNTAS.map((pergunta) => (
+                    <li key={pergunta}>
+                      <button
+                        type="button"
+                        onClick={() => enviar(pergunta, true)}
+                        className="rounded-full border border-azul/40 bg-white/70 px-3.5 py-2 text-left text-sm font-medium leading-snug transition-colors hover:border-azul hover:bg-white"
+                      >
+                        {pergunta}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {mensagens.length === 0 && cadastra && (
               <div className="ml-[2.625rem]">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wider text-suave">
                   Exemplos — toque para usar como modelo
@@ -339,7 +394,9 @@ export function Assistente() {
               const ultimaDoAssistente = m === ultimaMensagem && m.de === "assistente";
               return (
                 <div key={m.id} className="space-y-2">
-                  <Balao de={m.de}>{m.texto}</Balao>
+                  <Balao de={m.de} ia={m.ia}>
+                    {m.texto}
+                  </Balao>
                   {m.duplicado && (
                     <p className="ml-[2.625rem] text-sm">
                       <Link
@@ -408,7 +465,10 @@ export function Assistente() {
                 enterKeyHint="send"
                 autoComplete="off"
                 aria-label="Mensagem para o assistente"
-                placeholder={(estado?.aguardando && DICA[estado.aguardando]) || "Dados do veículo…"}
+                placeholder={
+                  (estado?.aguardando && DICA[estado.aguardando]) ||
+                  (!cadastra ? "Sua pergunta…" : eu.ia_ligada ? "Dados do veículo ou uma pergunta…" : "Dados do veículo…")
+                }
                 className="max-h-[10.5rem] min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] leading-relaxed placeholder:text-suave/60"
               />
               <Botao type="submit" disabled={enviando || !texto.trim()} className="shrink-0">
@@ -421,9 +481,11 @@ export function Assistente() {
           </form>
         </section>
 
-        <aside className="sticky top-8 hidden lg:block">
-          <Ficha resposta={ultima} />
-        </aside>
+        {cadastra && (
+          <aside className="sticky top-8 hidden lg:block">
+            <Ficha resposta={ultima} />
+          </aside>
+        )}
       </div>
     </>
   );

@@ -13,6 +13,11 @@ os.environ["DATABASE_URL"] = os.environ.get(
 os.environ["AMBIENTE"] = "teste"
 os.environ["UPLOADS_DIR"] = tempfile.mkdtemp(prefix="rcmotos-uploads-")
 os.environ["DADOS_DEMO"] = "false"
+# Os testes nunca chamam a IA de verdade: sem chaves, e test_ia.py usa transportes falsos.
+os.environ["IA_PROVEDOR"] = "groq"
+os.environ["GROQ_API_KEY"] = ""
+os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["IA_MODELO"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

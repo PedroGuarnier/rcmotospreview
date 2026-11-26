@@ -81,6 +81,7 @@ class UsuarioOut(Modelo):
 class EuOut(UsuarioOut):
     permissoes: list[str]
     dados_demo: bool
+    ia_ligada: bool  # o assistente responde perguntas sobre vendas, estoque e financeiro
 
 
 class _RegraComissaoMixin(BaseModel):
@@ -647,10 +648,24 @@ class AssistenteRascunho(BaseModel):
     observacoes: TextoDoAssistente = Field(None, max_length=1000)  # cabe numa mensagem
 
 
+# Perguntas e respostas da IA guardadas no estado, para perguntas de seguimento ("e em
+# setembro?"). Só texto: os resultados das consultas ao banco não vão e voltam.
+MAX_TROCAS_IA = 6
+MAX_RESPOSTA_IA = 2000
+
+
+class AssistenteTroca(BaseModel):
+    pergunta: Annotated[str, BeforeValidator(_so_texto), Field(min_length=1, max_length=1000)]
+    resposta: Annotated[
+        str, BeforeValidator(_so_texto), Field(min_length=1, max_length=MAX_RESPOSTA_IA)
+    ]
+
+
 class AssistenteEstado(BaseModel):
     """Vai e volta a cada mensagem: o servidor não guarda a conversa."""
 
     rascunho: AssistenteRascunho = Field(default_factory=AssistenteRascunho)
+    historico: list[AssistenteTroca] = Field(default_factory=list, max_length=MAX_TROCAS_IA)
     # campo que o assistente acabou de perguntar, ou "confirmacao"
     aguardando: (
         Literal[
@@ -709,3 +724,4 @@ class AssistenteResposta(BaseModel):
     veiculo: AssistenteVeiculo | None = None  # quando acao == "criado"
     duplicado: AssistenteDuplicado | None = None
     avisos: list[str]  # suposições feitas ("Considerei 2022 como ano de fabricação e do modelo.")
+    origem: Literal["regras", "ia"] = "regras"  # "ia": resposta de pergunta sobre o negócio

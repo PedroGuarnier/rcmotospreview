@@ -109,6 +109,8 @@ interface ItemMenu {
   rotulo: string;
   icone: keyof typeof ICONES;
   permissao?: Permissao;
+  /** regra própria de quando aparece (no lugar de `permissao`) */
+  visivel?: (eu: Eu) => boolean;
   /** aparece na barra inferior do celular */
   principal?: boolean;
 }
@@ -116,8 +118,14 @@ interface ItemMenu {
 const MENU: ItemMenu[] = [
   { href: "/painel", rotulo: "Painel", icone: "painel", permissao: "painel.ver", principal: true },
   { href: "/estoque", rotulo: "Estoque", icone: "estoque", permissao: "estoque.ver", principal: true },
-  // cadastro de veículo por mensagem: quem pode usar o formulário de cadastro
-  { href: "/assistente", rotulo: "Assistente", icone: "assistente", permissao: "estoque.editar", principal: true },
+  // cadastro por mensagem (quem usa o formulário de cadastro) e perguntas (todos, com a IA ligada)
+  {
+    href: "/assistente",
+    rotulo: "Assistente",
+    icone: "assistente",
+    visivel: (eu) => eu.ia_ligada || eu.permissoes.includes("estoque.editar"),
+    principal: true,
+  },
   { href: "/procedencia", rotulo: "Procedência", icone: "procedencia", permissao: "procedencia.consultar" },
   { href: "/vendas", rotulo: "Vendas", icone: "vendas", principal: true },
   { href: "/comissoes", rotulo: "Comissões", icone: "comissoes", principal: true },
@@ -160,7 +168,9 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
   }
   if (!eu) return <Carregando />;
 
-  const itens = MENU.filter((i) => !i.permissao || eu.permissoes.includes(i.permissao));
+  const itens = MENU.filter((i) =>
+    i.visivel ? i.visivel(eu) : !i.permissao || eu.permissoes.includes(i.permissao),
+  );
   const ativo = (href: string) => caminho === href || caminho.startsWith(`${href}/`);
 
   async function sair() {

@@ -15,6 +15,7 @@ revalidado com `schemas.VeiculoCriar` antes de gravar.
 
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
@@ -2403,8 +2404,13 @@ def conversar(
     usuario: Usuario,
     mensagem: str,
     estado: schemas.AssistenteEstado | None,
+    perguntas: Callable[[Interpretacao], str | None] | None = None,
 ) -> schemas.AssistenteResposta:
-    """Uma rodada da conversa: entende a mensagem, atualiza o rascunho e responde."""
+    """Uma rodada da conversa: entende a mensagem, atualiza o rascunho e responde.
+
+    `perguntas` responde o que não é cadastro (a IA, em `app/ia/atendimento.py`); quando
+    devolve None, vale a resposta do próprio motor.
+    """
     ano_maximo = hoje().year + 1
     rascunho: dict[str, Any] = estado.rascunho.model_dump(exclude_none=True) if estado else {}
     # O estado vem do navegador: só valem etapas de estoque e a mesma régua das mensagens.
@@ -2580,7 +2586,10 @@ def conversar(
         )
         return lembrar_pendencia()
     if lido.intencao == "fora_escopo":
-        if lido.venda:
+        texto = perguntas(lido) if perguntas else None
+        if texto:
+            paragrafos.append(texto)
+        elif lido.venda:
             paragrafos.append(
                 "Registrar venda ainda não é comigo: por enquanto eu só cadastro veículo novo. "
                 "Para dar baixa, use o botão Vender no veículo, na tela de Estoque."
@@ -2592,6 +2601,10 @@ def conversar(
             )
         return lembrar_pendencia()
     if lido.intencao == "nada":
+        texto = perguntas(lido) if perguntas and not rascunho else None
+        if texto:
+            paragrafos.append(texto)
+            return responder(None)
         if rascunho:
             paragrafos.append("Não entendi essa mensagem.")
             return lembrar_pendencia()
