@@ -82,14 +82,14 @@ def criar_demo(db, dono: Usuario) -> None:
     usuario("Gerente (exemplo)", "gerente@exemplo.com", Perfil.gerente)
     usuario("Financeiro (exemplo)", "financeiro@exemplo.com", Perfil.financeiro)
     v1 = usuario(
-        "Vendedor 1 (exemplo)",
+        "Carlos (exemplo)",
         "vendedor1@exemplo.com",
         Perfil.vendedor,
         RegraComissao.percentual_lucro,
         Decimal("10"),
     )
     v2 = usuario(
-        "Vendedor 2 (exemplo)",
+        "Ana (exemplo)",
         "vendedor2@exemplo.com",
         Perfil.vendedor,
         RegraComissao.valor_fixo,

@@ -11,12 +11,19 @@ Duas camadas:
 
 Não há estado no servidor: o cliente devolve o `estado` a cada mensagem e tudo é
 revalidado com `schemas.VeiculoCriar` antes de gravar.
+
+Além do cadastro, o mesmo assistente registra venda ("vendi a biz pro João...") e altera um
+veículo do estoque ("a CG agora custa 13.900"): a leitura dessas frases fica em
+`app/assistente_acoes.py`, a conversa em `app/assistente_venda.py` e
+`app/assistente_edicao.py`, a busca do veículo/vendedor em `app/assistente_busca.py` e as
+datas faladas ("ontem", "dia 20") em `app/assistente_datas.py`.
 """
 
 import re
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -25,7 +32,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import schemas, validacao
+from app import assistente_datas, schemas, validacao
 from app.models import Situacao, TipoVeiculo, Usuario, Veiculo
 from app.permissoes import P, pode
 from app.rotas.veiculos import criar_veiculo
@@ -37,6 +44,7 @@ EXEMPLO = (
     "comprei por 11.500 e vou vender por 14.900"
 )
 EXEMPLO_CURTO = "chegou uma Biz 125 2021 branca, 22 mil km, comprei por 9 mil"
+EXEMPLO_VENDA = "vendi a CG 160 placa ABC1D23 pro João Silva por 14.900 à vista"
 
 ANO_MINIMO = 1950
 CENTAVO = Decimal("0.01")
@@ -475,6 +483,19 @@ _COMUNS = set(
     "cilindrada cilindradas".split()
 )
 
+# Antes da marca: "oi, chegou uma lifan", "bom dia galera".
+_ANTES_DA_MARCA = set(
+    "oi ola opa eae eai salve bom boa dia tarde noite pessoal galera gente olha entao hj "
+    "chegaram temos tenho ganhei trouxe troquei".split()
+)
+# Palavras que nunca são marca, mesmo no começo da frase.
+_NAO_SAO_MARCA = set(
+    "vendi vendemos vendeu vendida vendido muda mude altera atualiza corrige troca baixa "
+    "sobe tira remove coloca poe bota passa quanto quanta quantos quantas qual quais quem "
+    "onde como porque pq kkk kkkk haha preciso quero pode posso tem teve valor preco "
+    "custo lucro margem promocao oferta estoque".split()
+)
+
 _CAMPOS_REMOVIVEIS = {
     "placa": ("placa",),
     "chassi": ("chassi",),
@@ -524,6 +545,10 @@ _CONTATOS = (
     re.compile(r"(?:\(\d{2}\)\s*|\b\d{2}\s+)(?:9\s?)?\d{4}-?\d{4}\b"),
     re.compile(r"\b9\s?\d{4}-\d{4}\b"),
     re.compile(r"\b\d{2}9\d{8}\b"),
+)
+_FINAL_DA_PLACA = re.compile(
+    r"\b(?:placa\s+)?(?:(?:com\s+)?final|terminad[ao] em|termina em)\s*(?:da placa\s*)?"
+    r"[:=-]?\s*([a-z0-9]{1,4})\b"
 )
 _PLACA_SOLTA = re.compile(r"\b([a-z]{3})-?(\d[a-z0-9]\d{2})\b")
 _PLACA_MERCOSUL_ESPACO = re.compile(r"\b([a-z]{3}) (\d[a-z]\d{2})\b")
@@ -616,8 +641,75 @@ _VARIOS = re.compile(
 )
 _PERGUNTA = re.compile(
     r"^(?:quant[oa]s?|qual|quais|quem|quando|onde|cade|me mostra|mostra|mostrar|mostre|"
-    r"lista|listar|liste|relatorio|resumo|tem quant)\b"
+    r"lista|listar|liste|relatorio|resumo|tem quant|tem algum[a]?|temos algum[a]?)\b"
 )
+# o que uma pergunta sobre o estoque pode citar sem virar cadastro ("tem CG 160 vermelha?")
+_DESCRITIVOS = {"situacao", "tipo", "marca", "modelo", "cor", "ano_fabricacao", "ano_modelo"}
+
+
+# "vendi a biz pro João", "o Carlos vendeu a CG", "dar baixa na venda da XRE"
+_VENDA_PEDIDO = re.compile(
+    r"\b(?:vendi|vendemos|vendeu|venderam|vendid[oa]|dar baixa|da baixa|dei baixa|"
+    r"baixa (?:de|da|na) venda|registr\w* (?:a |uma )?venda|lanc\w* (?:a |uma )?venda|"
+    r"nova venda)\b"
+)
+_QUANTIDADE = re.compile(r"\b(?:quant[oa]s?|quais|qual|total|relatorio|resumo|lista|ranking)\b")
+# Alteração de um veículo do estoque: verbo no começo ou marca de "valor novo" na frase.
+_EDICAO_VERBO = re.compile(
+    r"^(?:(?:por favor|pf|pfv|ah|oi|opa|entao|agora|ei|ow)\s+)*"
+    r"(?:muda|mudar|mude|altera|alterar|altere|atualiza|atualizar|atualize|corrige|corrigir|"
+    r"corrija|edita|editar|edite|troca|trocar|troque|baixa|baixar|abaixa|abaixar|sobe|subir|"
+    r"aumenta|aumentar|reduz|reduzir|diminui|diminuir|poe|coloca|colocar|coloque|bota|botar|"
+    r"bote|passa|passar|tira|tirar|tire|remove|remover|apaga|apagar)\b"
+)
+_EDICAO_EXPLICITA = re.compile(
+    r"^(?:(?:por favor|pf|pfv|ah|oi|opa|entao)\s+)*"
+    r"(?:muda|mudar|mude|altera|alterar|altere|atualiza|atualizar|atualize|corrige|corrigir|"
+    r"corrija|edita|editar|edite)\b"
+)
+_EDICAO_MARCA = re.compile(
+    r"\b(?:agora|ta com|esta com|ficou com|custa|custando|"
+    r"(?:poe|coloca|coloque|bota|bote|passa|joga|deixa|manda)\b.{0,50}?\b(?:a|na|pra|para|em) "
+    r"(?:venda|vitrine|preparacao|documentacao|oficina))\b"
+)
+# Sinais de veículo novo: com eles a frase é cadastro, não alteração.
+_CADASTRO_EVIDENCIA = re.compile(
+    r"\b(?:chegou|chegaram|entrou|cadastr\w*|comprei|compramos|comprad[oa]|comprou|paguei|"
+    r"pagamos|pagou|peguei|pegamos|pegou|adquiri\w*|investi|custou|"
+    r"nov[oa] (?:moto|carro|veiculo))\b"
+)
+
+
+def _pedido_de_venda(limpo: str) -> bool:
+    return _VENDA_PEDIDO.search(limpo) is not None and not _QUANTIDADE.search(limpo)
+
+
+def _pedido_de_edicao(limpo: str) -> bool:
+    if _CADASTRO_EVIDENCIA.search(limpo) and not _EDICAO_EXPLICITA.match(limpo):
+        return False
+    return _EDICAO_VERBO.match(limpo) is not None or _EDICAO_MARCA.search(limpo) is not None
+
+
+# Data da compra: logo depois da palavra de compra ("comprei ontem", "comprado em 15/11"),
+# ou um pouco depois, na mesma oração ("comprei por 9 mil ontem").
+_COMPRA_COM_DATA = re.compile(
+    r"\b(?:comprei|comprad[oa]|compramos|comprou|compra|peguei|pegamos|pegou|adquiri|"
+    r"adquirid[oa])\b[^.,;!?§]{0,40}?\b(?:(?:em|no|na|data|de)\s+)*"
+    rf"(?P<data>{assistente_datas.EXPRESSAO})"
+)
+# "ontem comprei uma biz": só hoje/ontem/anteontem e "dia 20" antes do verbo
+_DATA_ANTES_DA_COMPRA = re.compile(
+    r"(?<!chegou )(?<!entrou )(?<!chegaram )"
+    r"\b(?P<data>hoje|hj|ontem|anteontem|(?:no )?dia \d{1,2}(?![\d/]))\s+"
+    r"(?:eu |nos |a gente )?(?:comprei|compramos|peguei|pegamos)\b"
+)
+# "comprei por 9 mil e o IPVA vence dia 10": a data é de outra coisa
+_NAO_E_DA_COMPRA = re.compile(
+    r"\b(?:ipva|licenciamento|dpvat|vence|vencimento|parcela|revisao|vendo|venda|vender|"
+    r"anuncio|anunciar|multa|seguro)\b"
+)
+# "biz 21/22": par de anos, não data
+_DATA_DE_MES_INVALIDO = re.compile(r"(?:(?:no )?dia )?\d{1,2}/(?:1[3-9]|[2-9]\d|0?0)(?:/\d+)?")
 
 
 @dataclass(frozen=True)
@@ -735,8 +827,8 @@ _PARADAS = (
 class Interpretacao:
     """O que foi entendido de uma mensagem. Nada aqui toca o banco."""
 
-    # cadastro | afirmacao | negacao | dispensa | cancelar | ajuda | agradecimento |
-    # fora_escopo | nada
+    # cadastro | venda | edicao | afirmacao | negacao | dispensa | cancelar | ajuda |
+    # agradecimento | fora_escopo | nada
     intencao: str = "nada"
     campos: dict[str, Any] = field(default_factory=dict)
     remover: list[str] = field(default_factory=list)
@@ -746,6 +838,12 @@ class Interpretacao:
     soltos: list[tuple[Decimal, bool]] = field(default_factory=list)
     # pedido de registrar venda (para a resposta apontar a tela certa)
     venda: bool = False
+    # dúvidas que viram pergunta: (campo, pergunta, sugestão). Ex.: "dia 28" dito no dia 26.
+    perguntas: list[tuple[str, str, Any]] = field(default_factory=list)
+    # venda e alteração: como a mensagem aponta um veículo do estoque (placa, final da placa,
+    # marca, modelo, ano, cor) e, na venda, os dados da baixa (comprador, valor, forma...)
+    referencia: dict[str, Any] = field(default_factory=dict)
+    venda_dados: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -986,10 +1084,21 @@ class _Mencao:
 class _Leitor:
     """Uma passada pela mensagem. Cada etapa marca os tokens que usou."""
 
-    def __init__(self, mensagem: str, aguardando: str | None, ano_atual: int):
+    def __init__(
+        self,
+        mensagem: str,
+        aguardando: str | None,
+        ano_atual: int,
+        contexto: str | None = None,
+        dia: date | None = None,
+    ):
         self.original = mensagem
         self.aguardando = aguardando
         self.ano_atual = ano_atual
+        # o que está em andamento na conversa: None, "cadastro", "venda" ou "edicao"
+        self.contexto = contexto
+        self.dia = dia or hoje()
+        self.so_catalogo = False  # lendo só a referência a um veículo do estoque
         self.ano_maximo = ano_atual + 1
         self.r = Interpretacao()
         self.norm = _normalizar(mensagem)
@@ -1043,6 +1152,43 @@ class _Leitor:
             if texto:
                 self.r.campos["observacoes"] = texto
             self.apagar(m.start(), len(self.buf))
+
+    def limpar(self, ini: int, fim: int) -> None:
+        """Tira um trecho sem deixar marco: o que está em volta continua junto
+        ("comprei ontem por 9 mil" vira "comprei por 9 mil")."""
+        for k in range(ini, fim):
+            self.buf[k] = " "
+
+    def data_compra(self) -> None:
+        """ "comprei ontem", "comprei dia 20", "comprado em 15/11/2026": data da compra."""
+        texto = self.texto()
+        achada: re.Match | None = None
+        if self.aguardando == "data_compra":
+            achada = assistente_datas.procurar(texto)
+        else:
+            for m in _COMPRA_COM_DATA.finditer(texto):
+                meio = texto[m.start() : m.start("data")]
+                if _DATA_DE_MES_INVALIDO.fullmatch(m["data"]) or _NAO_E_DA_COMPRA.search(meio):
+                    continue
+                achada = m
+                break
+            else:
+                m = _DATA_ANTES_DA_COMPRA.search(texto)
+                achada = m if m else None
+        if achada is None:
+            return
+        grupo = "data" if "data" in (achada.re.groupindex or {}) else 0
+        ini, fim = achada.start(grupo), achada.end(grupo)
+        lida = assistente_datas.ler(texto[ini:fim], self.dia, o_que="da compra")
+        if lida is None:
+            return
+        self.limpar(ini, fim)
+        if lida.data is not None:
+            self.r.campos["data_compra"] = lida.data
+        elif lida.pergunta:
+            self.r.perguntas.append(("data_compra", lida.pergunta, lida.sugestao))
+        elif lida.erro:
+            self.r.erros.append(lida.erro)
 
     def datas(self) -> None:
         """Datas (10/11/2026) não são ano do veículo nem valor: ficam fora da leitura."""
@@ -1519,6 +1665,13 @@ class _Leitor:
                     self.usar(j, fim_livre)
                     self.fim_modelo = fim_livre
 
+        # "lifan 530 2015 prata comprei por 20 mil": marca e modelo fora do catálogo, sem
+        # "moto" nem "carro" na frase. Ficam como escritos e o tipo vira pergunta.
+        if marca is None and modelo is None and depois_do_tipo is None:
+            desconhecido = self._marca_desconhecida()
+            if desconhecido:
+                marca, modelo = desconhecido
+
         if marca:
             campos["marca"] = marca
         if modelo:
@@ -1530,6 +1683,73 @@ class _Leitor:
                 campos["tipo"] = next(iter(_TIPOS_DA_MARCA[marca]))
             elif entrada is not None:
                 campos["tipo"] = entrada.tipo
+
+    def _marca_desconhecida(self) -> tuple[str, str] | None:
+        """Primeira palavra da mensagem fora do vocabulário, seguida de um nome de modelo
+        ("Lifan 530", "Zontes Tactic 400"), numa frase que tem outros dados de veículo."""
+        if self.respondendo or self.so_catalogo:
+            return None
+        toks, n = self.toks, len(self.toks)
+        i = 0
+        while i < n and (
+            toks[i].usado
+            or not (toks[i].palavra or toks[i].num)
+            or toks[i].t in _PARADAS
+            or toks[i].t in _ANTES_DA_MARCA
+        ):
+            i += 1
+        if i + 1 >= n or not toks[i].palavra or len(toks[i].t) < 3 or toks[i + 1].usado:
+            return None
+        palavra = toks[i].t
+        if (
+            palavra in _NAO_SAO_MARCA
+            or palavra in _ANTES_NAO_E_VALOR
+            or palavra in _ANTES_NAO_E_ANO
+            or palavra in _ANTES_NAO_E_COR
+            or palavra in _TEM_COR_PROPRIA
+            or palavra in _TONS
+            or palavra in _VERSOES
+            or palavra in _FAMILIAS
+            or palavra in _NUMEROS_POR_EXTENSO
+            or palavra in _UNIDADES_KM
+            or self._marca_em(i)
+            or toks[i + 1].colado
+        ):
+            return None
+        if not self._tem_dado_de_veiculo():
+            return None
+        j = i + 1
+        seguinte = toks[j]
+        if seguinte.num:
+            numero = seguinte.t
+            if not numero.isdigit() or not 2 <= len(numero) <= 4:
+                return None
+            if len(numero) == 4 and self.ano_plausivel(int(numero)):
+                return None  # "galera 2015": o número é o ano
+            depois = self.t(j + 1)
+            if depois in ("mil", "k", "x", "/", "reais", "real") or depois in _UNIDADES_KM:
+                return None
+            modelo, fim = numero, j + 1
+            if fim < n and toks[fim].colado and toks[fim].palavra and len(toks[fim].t) <= 2:
+                modelo, fim = modelo + toks[fim].t.upper(), fim + 1  # "530i" fica "530I"
+        elif seguinte.palavra and seguinte.t not in _PARADAS and seguinte.t not in _TONS:
+            modelo, fim = self._modelo_livre(j)
+            if not modelo:
+                return None
+        else:
+            return None
+        self.usar(i, fim)
+        self.fim_modelo = fim
+        return _bonito(self.trecho(i, i + 1)), modelo
+
+    def _tem_dado_de_veiculo(self) -> bool:
+        """Ano, km, cor ou valor de compra/venda na frase: é mesmo um veículo."""
+        for k, tok in enumerate(self.toks):
+            if tok.t in _UNIDADES_KM or tok.t in _CORES or tok.t in _PALAVRAS_DE_VALOR:
+                return True
+            if self._inteiro_em(k, (4,)) is not None and self.ano_plausivel(int(tok.t)):
+                return True
+        return False
 
     def quilometragem(self) -> None:
         toks = self.toks
@@ -2046,6 +2266,58 @@ class _Leitor:
             self.usar(i, fim)
             self.fim_modelo = fim
 
+    # ----- referência a um veículo do estoque (venda e alteração) -----
+
+    def referencia(self) -> dict[str, Any]:
+        """Como a frase aponta um veículo que já existe: placa, final da placa, marca, modelo,
+        ano, cor. Só o vocabulário do catálogo; o resto vira `texto` para a busca."""
+        self.so_catalogo = True
+        ref: dict[str, Any] = {}
+        m = _FINAL_DA_PLACA.search(self.texto())
+        if m:
+            ref["placa_final"] = m[1].upper()
+            self.apagar(m.start(), m.end())
+        erros = len(self.r.erros)
+        self.placa()
+        del self.r.erros[erros:]  # "placa abc12" como referência: a busca diz que não achou
+        self.contatos()
+        self.toks = _tokenizar(self.texto())
+        self.veiculo()
+        self.qtds = _quantidades(self.toks)
+        self.anos_marcados()
+        self.anos_soltos()
+        self.cor()
+        campos = self.r.campos
+        for campo in ("placa", "tipo", "marca", "modelo", "cor"):
+            if campo in campos:
+                ref[campo] = campos.pop(campo)
+        ano = campos.pop("ano_modelo", None) or campos.pop("ano_fabricacao", None)
+        campos.pop("ano_fabricacao", None)
+        if ano:
+            ref["ano"] = ano
+        # "considerei 2021 como ano...": aqui o ano só serve para achar o veículo
+        self.r.avisos[:] = [a for a in self.r.avisos if not a.startswith("Considerei")]
+        if self.dois_veiculos:
+            ref["dois"] = self.dois_veiculos
+        if not ({"marca", "modelo", "placa"} & set(ref)):
+            soltas = [
+                tok.t
+                for tok in self.toks
+                if not tok.usado
+                and tok.palavra
+                and len(tok.t) >= 3
+                and tok.t not in _PARADAS
+                and tok.t not in _NAO_SAO_MARCA
+                and tok.t not in _ANTES_DA_MARCA
+                and tok.t not in _SIM_NUCLEO
+                and tok.t not in _NAO_NUCLEO
+                and tok.t not in _SIM_ENFEITE
+                and tok.t not in _NAO_ENFEITE
+            ]
+            if 0 < len(soltas) <= 2:
+                ref["texto"] = " ".join(soltas)
+        return ref
+
     # ----- tudo junto -----
 
     def ler(self) -> Interpretacao:
@@ -2067,6 +2339,18 @@ class _Leitor:
             return r
         sim = _afirma(limpo) or _afirma(resto)
         nao = _nega(limpo) and not sim
+        pergunta = "?" in self.norm or _PERGUNTA.match(limpo) is not None
+        # Venda e alteração de veículo do estoque (app/assistente_acoes.py)
+        if self.contexto == "venda" or (_pedido_de_venda(limpo) and not pergunta):
+            from app.assistente_acoes import ler_venda  # import aqui: o módulo importa este
+
+            return ler_venda(self, limpo, sim=sim, nao=nao)
+        if self.contexto == "edicao" or (
+            self.contexto is None and not pergunta and _pedido_de_edicao(limpo)
+        ):
+            from app.assistente_acoes import ler_edicao  # import aqui: o módulo importa este
+
+            return ler_edicao(self, limpo, sim=sim, nao=nao)
         if _FORA_FORTE.search(limpo):
             r.intencao = "fora_escopo"
             r.venda = _VENDA_REGISTRO.search(limpo) is not None
@@ -2074,6 +2358,7 @@ class _Leitor:
 
         self.remocoes()
         self.observacoes()
+        self.data_compra()
         self.datas()
         self.documentos()
         self.placa()
@@ -2104,8 +2389,7 @@ class _Leitor:
                 "vez: mande os dados de um só."
             ]
 
-        pergunta = "?" in self.norm or _PERGUNTA.match(limpo) is not None
-        tem_dados = bool(r.campos or r.remover or r.erros or r.soltos)
+        tem_dados = bool(r.campos or r.remover or r.erros or r.soltos or r.perguntas)
         pede_ajuda = _SAUDACAO.fullmatch(limpo) or _AJUDA.search(limpo)
         if limpo in _DISPENSA and not tem_dados:
             r.intencao = "dispensa"
@@ -2121,6 +2405,12 @@ class _Leitor:
                 or (
                     _PERGUNTA.match(limpo)
                     and set(r.campos) <= {"situacao", "tipo", "marca", "modelo"}
+                )
+                # sem responder um campo, pergunta só com descrição do veículo (sem valor,
+                # km, placa...) é consulta ao estoque: "tem alguma CG 160 no estoque?"
+                or (
+                    set(r.campos) <= _DESCRITIVOS
+                    and (self.aguardando is None or _PERGUNTA.match(limpo) is not None)
                 )
             )
         ):
@@ -2139,14 +2429,23 @@ class _Leitor:
 
 
 def interpretar(
-    mensagem: str, aguardando: str | None = None, *, ano_atual: int | None = None
+    mensagem: str,
+    aguardando: str | None = None,
+    *,
+    ano_atual: int | None = None,
+    contexto: str | None = None,
+    dia: date | None = None,
 ) -> Interpretacao:
     """Lê uma mensagem e devolve o que deu para entender. Função pura: não consulta o banco.
 
     `aguardando` é o campo que a conversa acabou de perguntar: com ele, uma resposta curta
-    ("11500", "Honda Biz 125", "vermelha") é lida no contexto certo.
+    ("11500", "Honda Biz 125", "vermelha") é lida no contexto certo. `contexto` é o que está em
+    andamento ("cadastro", "venda", "edicao"); sem nada em andamento, a frase pode abrir uma
+    venda ("vendi a biz...") ou a alteração de um veículo ("a biz agora custa 9 mil").
+    `dia` é o dia de hoje (para "ontem", "dia 20").
     """
-    return _Leitor(mensagem, aguardando, ano_atual or hoje().year).ler()
+    dia = dia or hoje()
+    return _Leitor(mensagem, aguardando, ano_atual or dia.year, contexto, dia).ler()
 
 
 # ---------------------------------------------------------------------------------------
@@ -2169,6 +2468,7 @@ _ROTULOS = {
     "preco_venda": "Preço de venda",
     "situacao": "Situação",
     "observacoes": "Observações",
+    "data_compra": "Data da compra",
 }
 _NOME_NA_FRASE = {
     "tipo": "o tipo",
@@ -2184,6 +2484,7 @@ _NOME_NA_FRASE = {
     "valor_compra": "o valor de compra",
     "preco_venda": "o preço de venda",
     "observacoes": "a observação",
+    "data_compra": "a data da compra",
 }
 _SITUACOES = {
     Situacao.compra: "Compra",
@@ -2231,6 +2532,8 @@ def _valor_formatado(campo: str, rascunho: dict) -> str:
         return _moeda(valor)
     if campo == "situacao":
         return _SITUACOES[valor]
+    if campo == "data_compra":
+        return assistente_datas.formatar(valor)
     return str(valor)
 
 
@@ -2260,7 +2563,7 @@ def _ficha(db: Session, usuario: Usuario, rascunho: dict) -> list[schemas.Assist
     ano = _ano_formatado(rascunho)
     if ano:
         item("ano", ano)
-    for campo in ("cor", "km", "placa", "chassi", "renavam", _COMPRA, _VENDA):
+    for campo in ("cor", "km", "placa", "chassi", "renavam", _COMPRA, "data_compra", _VENDA):
         if campo in rascunho:
             item(campo, _valor_formatado(campo, rascunho))
     if rascunho:
@@ -2297,6 +2600,9 @@ def _conferir(campo: str, valor: Any, ano_maximo: int) -> str | None:
     elif campo == _COMPRA:
         if valor < 0 or valor >= Decimal("10000000000"):
             return "Não consegui usar esse valor de compra; confira o número."
+    elif campo == "data_compra":
+        if valor > hoje():
+            return f"A data da compra não pode ser futura ({assistente_datas.formatar(valor)})."
     elif campo == _VENDA:
         if valor <= 0:
             return "O preço de venda precisa ser maior que zero."
@@ -2323,7 +2629,7 @@ def _faltando(rascunho: dict) -> list[str]:
     return faltam
 
 
-def _pergunta(campo: str, faltam: list[str]) -> str:
+def _pergunta(campo: str, faltam: list[str], rascunho: dict | None = None) -> str:
     if campo == "marca":
         if "modelo" in faltam:
             return "Qual é a marca e o modelo? Por exemplo: Honda Biz 125."
@@ -2331,7 +2637,8 @@ def _pergunta(campo: str, faltam: list[str]) -> str:
     if campo == "modelo":
         return "Qual é o modelo? Por exemplo: CG 160 Fan."
     if campo == "tipo":
-        return "É moto ou carro?"
+        nome = " ".join(str(rascunho[c]) for c in ("marca", "modelo") if c in (rascunho or {}))
+        return f"{nome} é moto ou carro?" if nome else "É moto ou carro?"
     if campo == _COMPRA:
         return (
             "Qual foi o valor de compra? Pode responder só o número, "
@@ -2366,6 +2673,8 @@ def _resumo_do_que_mudou(mudou: list[str], rascunho: dict) -> str:
         partes.append(f"RENAVAM {rascunho['renavam']}")
     if _COMPRA in mudou:
         partes.append(f"compra por {_moeda(rascunho[_COMPRA])}")
+    if "data_compra" in mudou:
+        partes.append(f"comprado em {assistente_datas.formatar(rascunho['data_compra'])}")
     if _VENDA in mudou:
         partes.append(f"venda por {_moeda(rascunho[_VENDA])}")
     if "situacao" in mudou:
@@ -2390,13 +2699,27 @@ def _frase_soltos(soltos: list[tuple[Decimal, bool]]) -> str:
     )
 
 
-def _texto_ajuda() -> str:
-    return (
+def _texto_ajuda(usuario: Usuario | None = None) -> str:
+    cadastra = usuario is None or pode(usuario, P.estoque_editar)
+    vende = usuario is not None and pode(usuario, P.vendas_registrar)
+    if not cadastra:
+        return (
+            "Olá! Eu registro venda por mensagem: escreva do jeito que você fala o veículo "
+            "(placa ou modelo), o comprador, o valor e a forma de pagamento.\n"
+            f"Exemplo: {EXEMPLO_VENDA}.\n"
+            "Antes de gravar eu mostro a ficha da venda e peço a sua confirmação."
+        )
+    texto = (
         "Olá! Eu cadastro veículo novo no estoque por mensagem: escreva os dados do jeito que "
         "você fala, em qualquer ordem, e eu monto a ficha.\n"
         f"Exemplo: {EXEMPLO}.\n"
-        "Antes de gravar eu mostro a ficha e peço a sua confirmação."
     )
+    texto += (
+        "Também altero um veículo do estoque (“a Biz placa ABC1D23 agora custa 9.900”, "
+        "“põe a XRE 300 à venda”)"
+    )
+    texto += f" e registro venda (“{EXEMPLO_VENDA}”).\n" if vende else ".\n"
+    return texto + "Antes de gravar eu mostro a ficha e peço a sua confirmação."
 
 
 def conversar(
@@ -2411,8 +2734,14 @@ def conversar(
     `perguntas` responde o que não é cadastro (a IA, em `app/ia/atendimento.py`); quando
     devolve None, vale a resposta do próprio motor.
     """
+    modo = estado.modo if estado else None
+    if modo in ("venda", "edicao"):  # venda ou alteração em andamento
+        return _conversar_acao(db, usuario, mensagem, estado, modo)
     ano_maximo = hoje().year + 1
     rascunho: dict[str, Any] = estado.rascunho.model_dump(exclude_none=True) if estado else {}
+    pode_cadastrar = pode(usuario, P.estoque_editar)
+    if not pode_cadastrar:
+        rascunho.clear()  # o estado vem do navegador: sem a permissão, não há cadastro
     # O estado vem do navegador: só valem etapas de estoque e a mesma régua das mensagens.
     if rascunho.get("situacao") not in _SITUACOES:
         rascunho.pop("situacao", None)
@@ -2420,10 +2749,12 @@ def conversar(
         del rascunho[campo]
     aguardando = estado.aguardando if estado else None
     tinha_rascunho = bool(rascunho)
-    lido = interpretar(mensagem, aguardando)
+    lido = interpretar(mensagem, aguardando, contexto="cadastro" if rascunho else None)
 
     paragrafos: list[str] = []
     avisos: list[str] = []
+    opcoes: list[schemas.AssistenteOpcao] = []
+    data_em_duvida: list = []  # data da compra que virou pergunta
     acao = "nenhuma"
     veiculo_criado: schemas.AssistenteVeiculo | None = None
     # opcionais que a pessoa acabou de dizer que não tem ("sem placa"): não cobro de novo
@@ -2451,6 +2782,7 @@ def conversar(
             veiculo=veiculo_criado,
             duplicado=duplicado,
             avisos=avisos,
+            opcoes=opcoes,
         )
 
     def seguir() -> schemas.AssistenteResposta:
@@ -2469,8 +2801,10 @@ def conversar(
             return responder(duplicado.campo)
         faltam = _faltando(rascunho)
         if faltam:
-            paragrafos.append(_pergunta(faltam[0], faltam))
+            paragrafos.append(_pergunta(faltam[0], faltam, rascunho))
             return responder(faltam[0])
+        if data_em_duvida:  # "comprei dia 28" no dia 26: pergunta antes de pedir a confirmação
+            return responder("data_compra")
         acao = "confirmar"
         sugeridos = [
             _sem_artigo(c) for c in _SUGERIDOS if c not in dispensados and _campo_vazio(rascunho, c)
@@ -2497,6 +2831,24 @@ def conversar(
             )
             return responder("confirmacao")
         return seguir()
+
+    # 0. Venda e alteração de veículo do estoque
+    if lido.intencao == "venda":
+        if rascunho:
+            paragrafos.append(
+                "Há um cadastro em andamento. Confirme ou responda “cancela” antes de "
+                "registrar a venda."
+            )
+            return lembrar_pendencia()
+        return _conversar_acao(db, usuario, mensagem, estado, "venda", lido)
+    if lido.intencao == "edicao":
+        return _conversar_acao(db, usuario, mensagem, estado, "edicao", lido)
+    if not pode_cadastrar and lido.intencao in ("cadastro", "afirmacao", "dispensa"):
+        paragrafos.append(
+            "Seu perfil não cadastra veículos no estoque. Por aqui você pode registrar uma "
+            f"venda, por exemplo: {EXEMPLO_VENDA}."
+        )
+        return responder(None)
 
     # 1. Cancelar
     if lido.intencao == "cancelar":
@@ -2538,7 +2890,7 @@ def conversar(
                 id=veiculo.id, descricao=veiculo.descricao, placa=veiculo.placa
             )
             etapa = _SITUACOES[veiculo.situacao]
-            passos = "adicione as fotos na página do veículo"
+            passos = "adicione as fotos aqui mesmo, no botão abaixo,"
             if veiculo.placa:
                 passos += " e consulte a procedência pela placa"
             paragrafos.append(
@@ -2576,7 +2928,7 @@ def conversar(
 
     # 3. Ajuda e assuntos que ainda não são deste assistente
     if lido.intencao == "ajuda":
-        paragrafos.append(_texto_ajuda())
+        paragrafos.append(_texto_ajuda(usuario))
         return lembrar_pendencia()
     if lido.intencao == "agradecimento":
         paragrafos.append(
@@ -2661,6 +3013,12 @@ def conversar(
             )
     if lido.soltos:
         paragrafos.append(_frase_soltos(lido.soltos))
+    for _, pergunta, sugestao in lido.perguntas:
+        paragrafos.append(pergunta)
+        data_em_duvida.append(sugestao)
+        if sugestao:
+            data = assistente_datas.formatar(sugestao)
+            opcoes.append(schemas.AssistenteOpcao(rotulo=data, mensagem=data))
     if not paragrafos:
         paragrafos.append("Isso já estava na ficha.")
     return seguir()
@@ -2697,3 +3055,22 @@ def _frase_validacao(erro: ValidationError) -> str:
             mensagem = _MENSAGENS_VALIDACAO.get(detalhe["type"], "valor inválido")
             frases.append(f"{_ROTULOS.get(campo, campo)}: {mensagem}")
     return "; ".join(frases)
+
+
+def _conversar_acao(
+    db: Session,
+    usuario: Usuario,
+    mensagem: str,
+    estado: schemas.AssistenteEstado | None,
+    modo: str,
+    lido: Interpretacao | None = None,
+) -> schemas.AssistenteResposta:
+    """Venda e alteração de veículo por mensagem (app/assistente_venda.py e
+    app/assistente_edicao.py). Import aqui: aqueles módulos importam este."""
+    if modo == "venda":
+        from app.assistente_venda import conversar_venda
+
+        return conversar_venda(db, usuario, mensagem, estado, lido)
+    from app.assistente_edicao import conversar_edicao
+
+    return conversar_edicao(db, usuario, mensagem, estado, lido)

@@ -108,22 +108,33 @@ interface ItemMenu {
   href: string;
   rotulo: string;
   icone: keyof typeof ICONES;
-  permissao?: Permissao;
+  /** basta ter uma delas */
+  permissao?: Permissao | Permissao[];
   /** regra própria de quando aparece (no lugar de `permissao`) */
   visivel?: (eu: Eu) => boolean;
   /** aparece na barra inferior do celular */
   principal?: boolean;
 }
 
+/** Quem usa o assistente: quem cadastra veículo ou quem registra venda. */
+export const PERMISSOES_DO_ASSISTENTE: Permissao[] = ["estoque.editar", "vendas.registrar"];
+
+function temAlguma(eu: Eu, permissao?: Permissao | Permissao[]): boolean {
+  if (!permissao) return true;
+  const lista = Array.isArray(permissao) ? permissao : [permissao];
+  return lista.some((p) => eu.permissoes.includes(p));
+}
+
 const MENU: ItemMenu[] = [
   { href: "/painel", rotulo: "Painel", icone: "painel", permissao: "painel.ver", principal: true },
   { href: "/estoque", rotulo: "Estoque", icone: "estoque", permissao: "estoque.ver", principal: true },
-  // cadastro por mensagem (quem usa o formulário de cadastro) e perguntas (todos, com a IA ligada)
+  // por mensagem: cadastrar e alterar veículo (estoque.editar), registrar venda
+  // (vendas.registrar) e perguntas sobre o negócio (todos, com a IA ligada)
   {
     href: "/assistente",
     rotulo: "Assistente",
     icone: "assistente",
-    visivel: (eu) => eu.ia_ligada || eu.permissoes.includes("estoque.editar"),
+    visivel: (eu) => eu.ia_ligada || temAlguma(eu, PERMISSOES_DO_ASSISTENTE),
     principal: true,
   },
   { href: "/procedencia", rotulo: "Procedência", icone: "procedencia", permissao: "procedencia.consultar" },
@@ -168,9 +179,7 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
   }
   if (!eu) return <Carregando />;
 
-  const itens = MENU.filter((i) =>
-    i.visivel ? i.visivel(eu) : !i.permissao || eu.permissoes.includes(i.permissao),
-  );
+  const itens = MENU.filter((i) => (i.visivel ? i.visivel(eu) : temAlguma(eu, i.permissao)));
   const ativo = (href: string) => caminho === href || caminho.startsWith(`${href}/`);
 
   async function sair() {
@@ -297,10 +306,17 @@ export function AreaLogada({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Bloqueia a página para quem não tem a permissão (a API também bloqueia). */
-export function Exigir({ permissao, children }: { permissao: Permissao; children: React.ReactNode }) {
-  const pode = usePode();
-  if (!pode(permissao)) {
+/** Bloqueia a página para quem não tem a permissão (a API também bloqueia). Com uma lista,
+ * basta ter uma delas. */
+export function Exigir({
+  permissao,
+  children,
+}: {
+  permissao: Permissao | Permissao[];
+  children: React.ReactNode;
+}) {
+  const eu = useEu();
+  if (!temAlguma(eu, permissao)) {
     return (
       <div className="rounded-2xl bg-white p-10 text-center text-suave">
         Seu perfil não tem acesso a esta página.

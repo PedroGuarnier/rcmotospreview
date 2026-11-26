@@ -2,20 +2,28 @@ import { useSyncExternalStore } from "react";
 import type {
   DuplicadoAssistente,
   EstadoAssistente,
+  Foto,
   RespostaAssistente,
   VeiculoCriadoAssistente,
+  VendaRegistradaAssistente,
 } from "@/lib/tipos";
 
 export interface Mensagem {
   id: number;
   de: "voce" | "assistente" | "sistema";
   texto: string;
-  /** resposta em que o veículo foi criado: vira o cartão de sucesso */
+  /** resposta em que o veículo foi criado ou alterado: vira o cartão de sucesso */
   veiculo?: VeiculoCriadoAssistente | null;
+  /** "criado" ou "atualizado" (o cartão muda o título) */
+  acao?: RespostaAssistente["acao"];
+  /** resposta em que a venda foi registrada */
+  venda?: VendaRegistradaAssistente | null;
   /** resposta que encontrou a placa ou o chassi em outro veículo */
   duplicado?: DuplicadoAssistente | null;
   /** resposta da IA (pergunta sobre o negócio): o balão ganha um rótulo */
   ia?: boolean;
+  /** fotos enviadas pelo cartão de sucesso (ficam na conversa) */
+  fotos?: Foto[];
 }
 
 export interface Conversa {

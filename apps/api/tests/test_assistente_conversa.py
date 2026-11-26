@@ -75,14 +75,16 @@ def test_frase_completa_confirma_e_cria(dono, db):
         "descricao": "Honda CG 160 Fan 2022 (ABC1D23)",
         "placa": "ABC1D23",
     }
-    assert r["estado"] == {
+    estado = {k: r["estado"][k] for k in ("rascunho", "aguardando", "modo", "historico")}
+    assert estado == {
         "rascunho": conversa.estado["rascunho"],
         "aguardando": None,
+        "modo": None,
         "historico": [],
     }
     assert all(valor is None for valor in r["estado"]["rascunho"].values())
     assert r["ficha"] == []
-    assert "fotos" in r["resposta"] and "procedência" in r["resposta"]
+    assert "fotos aqui mesmo" in r["resposta"] and "procedência" in r["resposta"]
 
     v = dono.get(f"/veiculos/{r['veiculo']['id']}").json()
     assert v["situacao"] == "compra"
@@ -337,8 +339,12 @@ def test_ajuda_e_fora_do_escopo_nao_perdem_o_rascunho(dono, db):
     assert "Exemplo:" in r["resposta"] and r["ficha"] == [] and r["acao"] == "nenhuma"
     r = conversa.dizer("quantas motos vendemos em outubro?")
     assert "só cadastro veículo novo" in r["resposta"] and r["ficha"] == []
+    # registrar venda agora é com o assistente (test_assistente_acoes.py): sem CG à venda,
+    # ele diz que não achou e pergunta qual foi
     r = conversa.dizer("vendi a cg pro joão por 14 mil")
-    assert "Registrar venda ainda não é comigo" in r["resposta"] and r["ficha"] == []
+    assert "Não encontrei CG à venda no estoque" in r["resposta"]
+    assert r["estado"]["modo"] == "venda" and r["estado"]["aguardando"] == "veiculo"
+    assert conversa.dizer("cancela")["acao"] == "cancelado"
     r = conversa.dizer("xyzzy")
     assert "Não entendi" in r["resposta"] and "Exemplo:" in r["resposta"]
 
@@ -373,7 +379,10 @@ def test_lucro_previsto_e_imposto_so_com_custos_ver(dono, db):
 def test_permissoes(dono, gerente, vendedor, financeiro, anonimo):
     corpo = {"mensagem": FRASE, "estado": None}
     assert anonimo.post("/assistente/mensagem", json=corpo).status_code == 401
-    assert vendedor.post("/assistente/mensagem", json=corpo).status_code == 403
+    # o vendedor usa o assistente para registrar venda, mas não cadastra veículo
+    r = vendedor.post("/assistente/mensagem", json=corpo)
+    assert r.status_code == 200 and r.json()["ficha"] == [] and r.json()["acao"] == "nenhuma"
+    assert "não cadastra veículos" in r.json()["resposta"]
     assert financeiro.post("/assistente/mensagem", json=corpo).status_code == 403
     assert gerente.post("/assistente/mensagem", json=corpo).json()["acao"] == "confirmar"
     assert dono.post("/assistente/mensagem", json=corpo).json()["acao"] == "confirmar"

@@ -14,8 +14,8 @@ router = APIRouter(prefix="/assistente", tags=["assistente"])
 @router.post("/mensagem", response_model=schemas.AssistenteResposta)
 def mensagem(
     dados: schemas.AssistenteMensagem,
-    # Cadastro exige estoque.editar (a mesma do formulário); perguntas, qualquer perfil
-    # com a IA ligada. Quem decide é `atendimento.atender`.
+    # Cadastro e alteração exigem estoque.editar; venda, vendas.registrar; perguntas,
+    # qualquer perfil com a IA ligada. Quem decide é `atendimento.atender`.
     usuario: Usuario = Depends(usuario_atual),
     db: Session = Depends(obter_db),
     provedor: Provedor | None = Depends(provedor_ia),

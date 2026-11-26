@@ -1,11 +1,12 @@
 """Quem responde cada mensagem do assistente: o motor de regras decide primeiro.
 
-- Quem pode cadastrar veículo (`estoque.editar`) conversa com o motor de regras. Só vai
+- Quem pode cadastrar/alterar veículo (`estoque.editar`) ou registrar venda
+  (`vendas.registrar`) conversa com o motor de regras; cada ação confere a sua permissão. Só vai
   para a IA o que ele classifica como pergunta / fora do escopo (ou mensagem que ele não
   entendeu, sem cadastro em andamento). Com um rascunho aguardando resposta, a pergunta é
   respondida e o rascunho continua no estado, com a pendência repetida.
-- Quem não cadastra (financeiro, vendedor) usa o assistente só para perguntas, e só com a
-  IA ligada.
+- Quem não tem nenhuma das duas (financeiro) usa o assistente só para perguntas, e só com
+  a IA ligada.
 
 O histórico curto (últimas trocas de pergunta e resposta da IA, só texto) vai e volta no
 `estado`, como o rascunho: o servidor não guarda a conversa.
@@ -54,8 +55,8 @@ def atender(
 ) -> schemas.AssistenteResposta:
     historico = list(estado.historico) if estado else []
 
-    if not pode(usuario, P.estoque_editar):
-        if provedor is None:  # sem cadastro e sem IA, o assistente não tem o que oferecer
+    if not (pode(usuario, P.estoque_editar) or pode(usuario, P.vendas_registrar)):
+        if provedor is None:  # sem ação por mensagem e sem IA, não há o que oferecer
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, "Seu perfil não tem acesso a esta função."
             )

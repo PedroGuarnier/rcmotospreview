@@ -419,10 +419,12 @@ def test_argumentos_invalidos_voltam_como_erro_para_o_modelo(dono, ia):
     assert "inválidos" in ia.resultado()["erro"]
 
 
-def test_sem_cadastro_e_sem_ia_o_assistente_continua_fechado(vendedor, financeiro):
-    for api in (vendedor, financeiro):
-        r = api.post("/assistente/mensagem", json={"mensagem": "quanto vendemos?"})
-        assert r.status_code == 403
+def test_sem_acao_por_mensagem_e_sem_ia_o_assistente_continua_fechado(financeiro, vendedor):
+    r = financeiro.post("/assistente/mensagem", json={"mensagem": "quanto vendemos?"})
+    assert r.status_code == 403
+    # o vendedor registra venda por mensagem: o assistente abre, a pergunta fica sem IA
+    r = vendedor.post("/assistente/mensagem", json={"mensagem": "quanto vendemos?"})
+    assert r.status_code == 200 and r.json()["origem"] == "regras"
 
 
 def test_financeiro_pergunta_com_a_ia_ligada(financeiro, ia):
@@ -680,8 +682,9 @@ def test_pergunta_com_confirmacao_pendente_mantem_os_botoes(dono, ia):
 
 def test_registrar_venda_continua_com_o_motor(dono, ia):
     r = perguntar(dono, "vendi a cg pro joão por 14 mil")
-    assert "Registrar venda ainda não é comigo" in r["resposta"] and r["origem"] == "regras"
-    assert ia.corpos == []
+    # o motor abre a venda (aqui não há CG à venda: ele pergunta qual veículo); a IA não entra
+    assert "Qual veículo foi vendido?" in r["resposta"] and r["origem"] == "regras"
+    assert r["estado"]["modo"] == "venda" and ia.corpos == []
     ia.roteiro = [texto("Em outubro você vendeu 1 moto.")]
     r = perguntar(dono, "quantas motos vendi em outubro?")  # "vendi", mas é pergunta
     assert r["origem"] == "ia"

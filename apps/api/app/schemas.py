@@ -646,6 +646,48 @@ class AssistenteRascunho(BaseModel):
     preco_venda: ValorPositivo | None = None
     situacao: Situacao | None = None
     observacoes: TextoDoAssistente = Field(None, max_length=1000)  # cabe numa mensagem
+    data_compra: date | None = None
+
+
+class AssistenteVendaRascunho(BaseModel):
+    """Venda por mensagem: os campos da baixa de venda (`VendaCriar`), todos opcionais até a
+    confirmação. Volta do navegador a cada mensagem e é conferida de novo antes de gravar."""
+
+    veiculo_id: int | None = None
+    comprador: TextoDoAssistente = Field(None, max_length=160)
+    telefone: Telefone = None
+    cpf_cnpj: CpfCnpj = None
+    valor: ValorPositivo | None = None
+    forma: FormaPagamento | None = None
+    banco: TextoDoAssistente = Field(None, max_length=120)
+    entrada: Valor | None = None
+    numero_parcelas: int | None = Field(None, ge=1, le=120)
+    valor_parcela: ValorPositivo | None = None
+    primeiro_vencimento: date | None = None
+    vendedor_id: int | None = None
+    data_venda: date | None = None
+
+
+CampoRemovivel = Literal[
+    "preco_venda",
+    "placa",
+    "chassi",
+    "renavam",
+    "cor",
+    "km",
+    "ano_fabricacao",
+    "ano_modelo",
+    "observacoes",
+    "data_compra",
+]
+
+
+class AssistenteEdicaoRascunho(BaseModel):
+    """Alteração de um veículo do estoque por mensagem: o que muda e o que é apagado."""
+
+    veiculo_id: int | None = None
+    mudancas: AssistenteRascunho = Field(default_factory=AssistenteRascunho)
+    remover: list[CampoRemovivel] = Field(default_factory=list, max_length=10)
 
 
 # Perguntas e respostas da IA guardadas no estado, para perguntas de seguimento ("e em
@@ -677,9 +719,27 @@ class AssistenteEstado(BaseModel):
             "placa",
             "chassi",
             "confirmacao",
+            "data_compra",
+            # venda e alteração por mensagem
+            "veiculo",
+            "comprador",
+            "valor_venda",
+            "forma",
+            "vendedor",
+            "numero_parcelas",
+            "valor_parcela",
+            "primeiro_vencimento",
+            "data_venda",
+            "mudanca",
         ]
         | None
     ) = None
+    # o que está em andamento: cadastro (padrão), venda ou alteração de um veículo
+    modo: Literal["cadastro", "venda", "edicao"] | None = None
+    venda: AssistenteVendaRascunho | None = None
+    edicao: AssistenteEdicaoRascunho | None = None
+    # veículos (ou vendedores) que o assistente listou para a pessoa escolher
+    candidatos: list[int] = Field(default_factory=list, max_length=10)
 
 
 class AssistenteMensagem(BaseModel):
@@ -692,6 +752,22 @@ class AssistenteItemFicha(BaseModel):
     rotulo: str
     valor: str  # já formatado para a tela: "R$ 11.500,00", "18.500 km", "ABC-1D23"
     calculado: bool = False  # lucro previsto e imposto estimado (só com custos.ver)
+    antes: str | None = None  # na alteração de um veículo: o valor que está gravado hoje
+
+
+class AssistenteOpcao(BaseModel):
+    """Resposta pronta que a tela mostra como botão (ex.: um dos veículos listados)."""
+
+    rotulo: str
+    mensagem: str
+
+
+class AssistenteVendaRegistrada(BaseModel):
+    id: int
+    veiculo_id: int
+    descricao: str
+    comprador: str
+    valor: Decimal
 
 
 class AssistenteCampo(BaseModel):
@@ -720,8 +796,10 @@ class AssistenteResposta(BaseModel):
     faltando: list[AssistenteCampo]  # obrigatórios que faltam
     sugeridos: list[AssistenteCampo]  # opcionais importantes que faltam
     pronto: bool  # obrigatórios preenchidos e válidos
-    acao: Literal["nenhuma", "confirmar", "cancelado", "criado"]
-    veiculo: AssistenteVeiculo | None = None  # quando acao == "criado"
+    acao: Literal["nenhuma", "confirmar", "cancelado", "criado", "atualizado", "registrado"]
+    veiculo: AssistenteVeiculo | None = None  # quando acao == "criado" ou "atualizado"
     duplicado: AssistenteDuplicado | None = None
     avisos: list[str]  # suposições feitas ("Considerei 2022 como ano de fabricação e do modelo.")
     origem: Literal["regras", "ia"] = "regras"  # "ia": resposta de pergunta sobre o negócio
+    venda: AssistenteVendaRegistrada | None = None  # quando acao == "registrado"
+    opcoes: list[AssistenteOpcao] = Field(default_factory=list)

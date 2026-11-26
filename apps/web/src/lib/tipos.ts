@@ -364,6 +364,44 @@ export interface RascunhoAssistente {
   preco_venda: string | null;
   situacao: Situacao | null;
   observacoes: string | null;
+  /** AAAA-MM-DD */
+  data_compra: string | null;
+}
+
+/** Venda por mensagem: os campos da baixa de venda, todos opcionais até a confirmação. */
+export interface VendaRascunhoAssistente {
+  veiculo_id: number | null;
+  comprador: string | null;
+  telefone: string | null;
+  cpf_cnpj: string | null;
+  valor: string | null;
+  forma: FormaPagamento | null;
+  banco: string | null;
+  entrada: string | null;
+  numero_parcelas: number | null;
+  valor_parcela: string | null;
+  primeiro_vencimento: string | null;
+  vendedor_id: number | null;
+  data_venda: string | null;
+}
+
+export type CampoRemovivelAssistente =
+  | "preco_venda"
+  | "placa"
+  | "chassi"
+  | "renavam"
+  | "cor"
+  | "km"
+  | "ano_fabricacao"
+  | "ano_modelo"
+  | "observacoes"
+  | "data_compra";
+
+/** Alteração de um veículo do estoque por mensagem: o que muda e o que é apagado. */
+export interface EdicaoRascunhoAssistente {
+  veiculo_id: number | null;
+  mudancas: RascunhoAssistente;
+  remover: CampoRemovivelAssistente[];
 }
 
 /** Uma pergunta respondida pela IA, guardada para perguntas de seguimento ("e em setembro?"). */
@@ -387,7 +425,24 @@ export interface EstadoAssistente {
     | "placa"
     | "chassi"
     | "confirmacao"
+    | "data_compra"
+    | "veiculo"
+    | "comprador"
+    | "valor_venda"
+    | "forma"
+    | "vendedor"
+    | "numero_parcelas"
+    | "valor_parcela"
+    | "primeiro_vencimento"
+    | "data_venda"
+    | "mudanca"
     | null;
+  /** o que está em andamento: cadastro (padrão), venda ou alteração de um veículo */
+  modo: "cadastro" | "venda" | "edicao" | null;
+  venda: VendaRascunhoAssistente | null;
+  edicao: EdicaoRascunhoAssistente | null;
+  /** veículos (ou vendedores) que o assistente listou para a pessoa escolher */
+  candidatos: number[];
 }
 
 export interface ItemFicha {
@@ -397,6 +452,22 @@ export interface ItemFicha {
   valor: string;
   /** lucro previsto e imposto estimado (só com custos.ver) */
   calculado: boolean;
+  /** na alteração de um veículo: o valor que está gravado hoje */
+  antes: string | null;
+}
+
+/** Resposta pronta que a tela mostra como botão (ex.: um dos veículos listados). */
+export interface OpcaoAssistente {
+  rotulo: string;
+  mensagem: string;
+}
+
+export interface VendaRegistradaAssistente {
+  id: number;
+  veiculo_id: number;
+  descricao: string;
+  comprador: string;
+  valor: string;
 }
 
 export interface CampoAssistente {
@@ -428,12 +499,15 @@ export interface RespostaAssistente {
   sugeridos: CampoAssistente[];
   /** obrigatórios preenchidos e válidos */
   pronto: boolean;
-  acao: "nenhuma" | "confirmar" | "cancelado" | "criado";
-  /** quando acao === "criado" */
+  acao: "nenhuma" | "confirmar" | "cancelado" | "criado" | "atualizado" | "registrado";
+  /** quando acao === "criado" ou "atualizado" */
   veiculo: VeiculoCriadoAssistente | null;
   duplicado: DuplicadoAssistente | null;
   /** suposições feitas ("Considerei 2022 como ano de fabricação e do modelo.") */
   avisos: string[];
   /** "ia": resposta de pergunta sobre o negócio */
   origem: "regras" | "ia";
+  /** quando acao === "registrado" */
+  venda: VendaRegistradaAssistente | null;
+  opcoes: OpcaoAssistente[];
 }

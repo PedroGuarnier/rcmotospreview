@@ -3,19 +3,22 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ErroApi, api, mensagemDe } from "@/lib/api";
-import type { EstadoAssistente, RespostaAssistente } from "@/lib/tipos";
+import { moeda } from "@/lib/formato";
+import type { EstadoAssistente, Foto, RespostaAssistente } from "@/lib/tipos";
 import { useEu, usePode } from "../Sessao";
 import { Barras, Botao, Titulo } from "../ui";
 import { Ficha } from "./Ficha";
+import { FotosPeloChat } from "./FotosPeloChat";
 import { type Mensagem, useConversa } from "./conversa";
 import "./assistente.css";
 
 // Frases de exemplo: mostram o jeito de escrever. Os dados são ilustrativos.
-const EXEMPLOS = [
-  "Honda CG 160 Fan 2022 vermelha, placa ABC1D23, 18.500 km, comprei por 11.500 e vou vender por 14.900",
+const EXEMPLOS_CADASTRO = [
+  "Honda CG 160 Fan 2022 vermelha, placa ABC1D23, 18.500 km, comprei ontem por 11.500 e vou vender por 14.900",
   "chegou uma biz 125 2021 branca, 22 mil km, comprei por 9 mil",
-  "fiat uno way 1.0 2015 prata, 98.000 km, compra R$ 24.000, venda R$ 31.900",
 ];
+const EXEMPLO_ALTERACAO = "a CG placa ABC1D23 agora custa 13.900";
+const EXEMPLO_VENDA = "vendi a CG placa ABC1D23 pro João Silva por 14.900 à vista";
 
 // Perguntas sobre o negócio (com a IA ligada): um toque envia.
 const PERGUNTAS = [
@@ -25,19 +28,23 @@ const PERGUNTAS = [
   "Como estão as comissões deste mês?",
 ];
 
-function boasVindas(cadastra: boolean, ia: boolean): string {
-  if (!cadastra) {
+function boasVindas(cadastra: boolean, vende: boolean, ia: boolean): string {
+  if (!cadastra && !vende) {
     return (
       "Olá! Eu respondo perguntas sobre vendas, estoque e comissões com os dados do sistema, " +
       "dentro do que o seu perfil pode ver."
     );
   }
+  const faz = [
+    cadastra && "cadastro veículo novo no estoque",
+    cadastra && "altero um veículo que já está lá",
+    vende && "registro venda",
+    ia && "respondo perguntas sobre vendas, estoque e financeiro",
+  ].filter(Boolean);
+  const lista = faz.length > 1 ? `${faz.slice(0, -1).join(", ")} e ${faz.at(-1)}` : faz[0];
   return (
-    (ia
-      ? "Olá! Eu cadastro veículo novo no estoque por mensagem e respondo perguntas sobre vendas, " +
-        "estoque e financeiro.\n"
-      : "Olá! Eu cadastro veículo novo no estoque por mensagem.\n") +
-    "Para cadastrar, escreva os dados do jeito que você fala, em qualquer ordem, e eu monto a ficha. " +
+    `Olá! Por mensagem eu ${lista}.\n` +
+    "Escreva do jeito que você fala, em qualquer ordem, e eu monto a ficha. " +
     "Antes de gravar eu mostro tudo e peço a sua confirmação."
   );
 }
@@ -52,7 +59,20 @@ const DICA: Record<NonNullable<EstadoAssistente["aguardando"]>, string> = {
   placa: "Placa certa…",
   chassi: "Chassi certo…",
   confirmacao: "O que precisa corrigir?",
+  data_compra: "Data da compra (DD/MM/AAAA)…",
+  veiculo: "Placa ou modelo do veículo…",
+  comprador: "Nome do comprador…",
+  valor_venda: "Valor da venda…",
+  forma: "À vista, financiado ou parcelado…",
+  vendedor: "Nome do vendedor…",
+  numero_parcelas: "Nº de parcelas…",
+  valor_parcela: "Valor da parcela…",
+  primeiro_vencimento: "1º vencimento (DD/MM/AAAA)…",
+  data_venda: "Data da venda (DD/MM/AAAA)…",
+  mudanca: "O que mudar…",
 };
+
+const CONFIRMAR = { cadastro: "Confirmar cadastro", venda: "Registrar venda", edicao: "Salvar alteração" };
 
 const LIMITE = 1000;
 const pausa = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
@@ -110,32 +130,42 @@ function Balao({ de, ia, children }: { de: Mensagem["de"]; ia?: boolean; childre
 const ATALHO =
   "inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm font-semibold transition-colors";
 
+function Sucesso({ titulo }: { titulo: string }) {
+  return (
+    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-verde">
+      <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8 12.5 3 3 5-6.5" />
+      </svg>
+      {titulo}
+    </p>
+  );
+}
+
 function Criado({
-  veiculo,
+  mensagem,
   aoCadastrarOutro,
+  aoEnviarFoto,
 }: {
-  veiculo: NonNullable<Mensagem["veiculo"]>;
+  mensagem: Mensagem;
   aoCadastrarOutro: () => void;
+  aoEnviarFoto: (foto: Foto) => void;
 }) {
   const pode = usePode();
+  const veiculo = mensagem.veiculo!;
+  const atualizado = mensagem.acao === "atualizado";
   return (
     <div className="entrar ml-[2.625rem] rounded-2xl border border-verde/30 bg-white p-4 sm:max-w-2xl">
-      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-verde">
-        <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="9" />
-          <path d="m8 12.5 3 3 5-6.5" />
-        </svg>
-        Veículo cadastrado
-      </p>
+      <Sucesso titulo={atualizado ? "Veículo atualizado" : "Veículo cadastrado"} />
       <p className="mt-1 text-lg font-bold leading-snug">{veiculo.descricao}</p>
+      {pode("estoque.editar") && (
+        <FotosPeloChat veiculoId={veiculo.id} fotos={mensagem.fotos ?? []} aoEnviar={aoEnviarFoto} />
+      )}
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Link href={`/estoque/${veiculo.id}`} className={`${ATALHO} bg-azul text-white hover:bg-azul-escuro`}>
           Abrir no estoque
         </Link>
-        <Link href={`/estoque/${veiculo.id}`} className={`${ATALHO} border border-borda bg-white hover:border-azul`}>
-          Adicionar fotos
-        </Link>
-        {veiculo.placa && pode("procedencia.consultar") && (
+        {!atualizado && veiculo.placa && pode("procedencia.consultar") && (
           <Link
             href={`/procedencia?placa=${veiculo.placa}`}
             className={`${ATALHO} border border-borda bg-white hover:border-azul`}
@@ -143,9 +173,31 @@ function Criado({
             Consultar procedência
           </Link>
         )}
-        <button type="button" onClick={aoCadastrarOutro} className={`${ATALHO} text-azul hover:bg-azul/10`}>
-          Cadastrar outro
-        </button>
+        {!atualizado && (
+          <button type="button" onClick={aoCadastrarOutro} className={`${ATALHO} text-azul hover:bg-azul/10`}>
+            Cadastrar outro
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VendaRegistrada({ venda }: { venda: NonNullable<Mensagem["venda"]> }) {
+  return (
+    <div className="entrar ml-[2.625rem] rounded-2xl border border-verde/30 bg-white p-4 sm:max-w-2xl">
+      <Sucesso titulo="Venda registrada" />
+      <p className="mt-1 text-lg font-bold leading-snug">{venda.descricao}</p>
+      <p className="mt-0.5 text-sm text-suave">
+        Para {venda.comprador} · <b className="num text-tinta">{moeda(venda.valor)}</b>
+      </p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Link href="/vendas" className={`${ATALHO} bg-azul text-white hover:bg-azul-escuro`}>
+          Ver vendas
+        </Link>
+        <Link href={`/estoque/${venda.veiculo_id}`} className={`${ATALHO} border border-borda bg-white hover:border-azul`}>
+          Abrir o veículo
+        </Link>
       </div>
     </div>
   );
@@ -154,7 +206,12 @@ function Criado({
 export function Assistente() {
   const eu = useEu();
   const pode = usePode();
-  const cadastra = pode("estoque.editar"); // sem isso, o assistente é só de perguntas (com a IA)
+  const cadastra = pode("estoque.editar");
+  const vende = pode("vendas.registrar"); // sem nenhuma das duas, só perguntas (com a IA)
+  const exemplos = [
+    ...(cadastra ? [...EXEMPLOS_CADASTRO, EXEMPLO_ALTERACAO] : []),
+    ...(vende ? [EXEMPLO_VENDA] : []),
+  ];
   const { conversa, atual, gravar, limpar } = useConversa(eu.id);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -168,6 +225,8 @@ export function Assistente() {
   const ultimaMensagem = mensagens.at(-1);
   const pedindoConfirmacao =
     !enviando && ultima?.acao === "confirmar" && ultimaMensagem?.de === "assistente";
+  const modo = ultima?.estado.modo ?? "cadastro";
+  const opcoes = !enviando && ultimaMensagem?.de === "assistente" ? (ultima?.opcoes ?? []) : [];
 
   // Altura: a conversa vai do título até o rodapé. O topo muda com a faixa de demonstração
   // e, no celular, com o botão "Nova conversa" (que só aparece depois da primeira mensagem).
@@ -261,6 +320,8 @@ export function Assistente() {
             de: "assistente",
             texto: resposta.resposta,
             veiculo: resposta.veiculo,
+            acao: resposta.acao,
+            venda: resposta.venda,
             duplicado: resposta.duplicado,
             ia: resposta.origem === "ia",
           },
@@ -301,6 +362,17 @@ export function Assistente() {
     campo.current?.focus();
   }
 
+  /** Foto enviada pelo cartão de sucesso: fica guardada na própria mensagem. */
+  function guardarFoto(mensagemId: number, foto: Foto) {
+    const agora = atual();
+    gravar({
+      ...agora,
+      mensagens: agora.mensagens.map((m) =>
+        m.id === mensagemId ? { ...m, fotos: [...(m.fotos ?? []).filter((f) => f.id !== foto.id), foto] } : m,
+      ),
+    });
+  }
+
   function novaConversa() {
     limpar();
     setTexto("");
@@ -313,11 +385,13 @@ export function Assistente() {
     <>
       <Titulo
         sobre={
-          !cadastra
-            ? "Pergunte sobre vendas, estoque e comissões"
-            : eu.ia_ligada
-              ? "Cadastre veículos e pergunte sobre o negócio"
-              : "Cadastre um veículo por mensagem"
+          cadastra
+            ? vende
+              ? "Cadastre, altere e venda por mensagem"
+              : "Cadastre e altere veículos por mensagem"
+            : vende
+              ? "Registre vendas por mensagem"
+              : "Pergunte sobre vendas, estoque e comissões"
         }
         acoes={
           mensagens.length > 0 && (
@@ -340,7 +414,7 @@ export function Assistente() {
             tabIndex={-1}
             className="space-y-3 outline-none"
           >
-            <Balao de="assistente">{boasVindas(cadastra, eu.ia_ligada)}</Balao>
+            <Balao de="assistente">{boasVindas(cadastra, vende, eu.ia_ligada)}</Balao>
 
             {mensagens.length === 0 && eu.ia_ligada && (
               <div className="ml-[2.625rem]">
@@ -363,13 +437,13 @@ export function Assistente() {
               </div>
             )}
 
-            {mensagens.length === 0 && cadastra && (
+            {mensagens.length === 0 && exemplos.length > 0 && (
               <div className="ml-[2.625rem]">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wider text-suave">
                   Exemplos — toque para usar como modelo
                 </p>
                 <ul className="space-y-2">
-                  {EXEMPLOS.map((exemplo) => (
+                  {exemplos.map((exemplo) => (
                     <li key={exemplo}>
                       <button
                         type="button"
@@ -407,17 +481,38 @@ export function Assistente() {
                       </Link>
                     </p>
                   )}
-                  {m.veiculo && <Criado veiculo={m.veiculo} aoCadastrarOutro={focar} />}
+                  {m.veiculo && (
+                    <Criado mensagem={m} aoCadastrarOutro={focar} aoEnviarFoto={(foto) => guardarFoto(m.id, foto)} />
+                  )}
+                  {m.venda && <VendaRegistrada venda={m.venda} />}
                   {/* No celular a ficha vem junto da resposta; no computador fica na coluna ao lado. */}
                   {ultimaDoAssistente && ultima && ultima.ficha.length > 0 && (
                     <div className="ml-[2.625rem] lg:hidden">
-                      <Ficha resposta={ultima} compacta />
+                      <Ficha resposta={ultima} cadastra={cadastra} compacta />
                     </div>
+                  )}
+                  {ultimaDoAssistente && opcoes.length > 0 && (
+                    <ul
+                      className="ml-[2.625rem] flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap"
+                      aria-label="Respostas prontas"
+                    >
+                      {opcoes.map((opcao) => (
+                        <li key={`${opcao.mensagem}-${opcao.rotulo}`}>
+                          <button
+                            type="button"
+                            onClick={() => enviar(opcao.mensagem, true)}
+                            className="min-h-10 w-full rounded-2xl border border-azul/40 bg-white px-4 py-2 text-left text-sm font-semibold text-azul transition-colors hover:border-azul hover:bg-azul/5 sm:w-auto"
+                          >
+                            {opcao.rotulo}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                   {ultimaDoAssistente && pedindoConfirmacao && (
                     <div className="ml-[2.625rem] grid grid-cols-2 gap-2 pt-1 sm:flex sm:flex-wrap">
                       <Botao onClick={() => enviar("sim", true)} className="col-span-2">
-                        Confirmar cadastro
+                        {CONFIRMAR[modo]}
                       </Botao>
                       <Botao tom="neutro" onClick={focar}>
                         Corrigir
@@ -467,7 +562,15 @@ export function Assistente() {
                 aria-label="Mensagem para o assistente"
                 placeholder={
                   (estado?.aguardando && DICA[estado.aguardando]) ||
-                  (!cadastra ? "Sua pergunta…" : eu.ia_ligada ? "Dados do veículo ou uma pergunta…" : "Dados do veículo…")
+                  (cadastra
+                    ? eu.ia_ligada
+                      ? "Dados do veículo ou uma pergunta…"
+                      : "Dados do veículo…"
+                    : vende
+                      ? eu.ia_ligada
+                        ? "Dados da venda ou uma pergunta…"
+                        : "Dados da venda…"
+                      : "Sua pergunta…")
                 }
                 className="max-h-[10.5rem] min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] leading-relaxed placeholder:text-suave/60"
               />
@@ -481,9 +584,9 @@ export function Assistente() {
           </form>
         </section>
 
-        {cadastra && (
+        {(cadastra || vende) && (
           <aside className="sticky top-8 hidden lg:block">
-            <Ficha resposta={ultima} />
+            <Ficha resposta={ultima} cadastra={cadastra} />
           </aside>
         )}
       </div>

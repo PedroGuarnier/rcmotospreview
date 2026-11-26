@@ -6,6 +6,7 @@ foi extraído a mais.
 """
 
 import enum
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -451,8 +452,8 @@ def test_ano_unico_avisa_a_suposicao():
             "titan 150 22 mil km",
             {"tipo": "moto", "marca": "Honda", "modelo": "CG 150 Titan", "km": 22000},
         ),
-        # data, IPVA e "comprada em" não são o ano do veículo
-        ("data da compra 10/11/2026", {}),
+        # data, IPVA e "comprada em" não são o ano do veículo (a data é a da compra)
+        ("data da compra 10/11/2026", {"data_compra": date(2026, 11, 10)}),
         ("biz ipva 2026 pago", BIZ),
         ("biz comprada em 2023", BIZ),
         # detalhes soltos não viram número de nada
@@ -763,7 +764,6 @@ def test_observacoes_ficam_como_foram_escritas():
             for frase in (
                 "quantas motos vendemos em outubro?",
                 "qual o lucro do mês?",
-                "vendi a cg 160 pro joão por 14 mil",
                 "me mostra o estoque",
                 "tem moto à venda?",
                 "quanto custa uma biz?",
@@ -781,7 +781,9 @@ def test_intencao(frase, intencao):
 
 
 def test_pedido_de_venda_e_marcado_para_a_resposta_certa():
-    assert ler("vendi a cg 160 pro joão por 14 mil").venda is True
+    # "vendi ..." agora registra a venda (antes era fora do escopo)
+    lido = ler("vendi a cg 160 pro joão por 14 mil")
+    assert lido.venda is True and lido.intencao == "venda" and lido.campos == {}
     assert ler("quantas motos vendemos em outubro?").venda is False
 
 
@@ -869,3 +871,26 @@ def test_valor_baixo_demais_na_resposta_curta():
 def test_nunca_quebra(frase):
     for aguardando in (None, "valor_compra", "marca", "modelo", "placa", "chassi", "confirmacao"):
         ler(frase, aguardando)
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        "tem alguma CG 160 no estoque?",
+        "tem biz à venda?",
+        "tem moto vermelha?",
+        "tem alguma xre 2022?",
+        "temos alguma biz branca",
+    ],
+)
+def test_pergunta_sobre_o_estoque_nao_vira_cadastro(frase):
+    r = ler(frase)
+    assert r.intencao == "fora_escopo" and r.campos == {}
+
+
+def test_descricao_com_dado_de_cadastro_continua_cadastro():
+    assert ler("chegou uma biz 125 2021 branca comprei por 9 mil").intencao == "cadastro"
+    assert ler("tem 22 mil km").campos == {"km": 22000}
+    # respondendo um campo, a interrogação não muda o sentido
+    assert ler("biz 125 2021 branca?", "modelo").intencao == "cadastro"
+    assert ler("a cor é branca?", "confirmacao").campos == {"cor": "Branca"}

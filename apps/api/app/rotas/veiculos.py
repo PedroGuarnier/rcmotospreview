@@ -129,8 +129,16 @@ def _conferir_duplicados(db: Session, placa: str | None, chassi: str | None, ign
             )
 
 
-def _conferir_situacao(veiculo: Veiculo, nova: Situacao) -> None:
-    """Regras da linha do veículo que valem para mudança manual de situação."""
+_PRECO_ATUAL = object()
+
+
+def _conferir_situacao(
+    veiculo: Veiculo, nova: Situacao, preco_venda: object = _PRECO_ATUAL
+) -> None:
+    """Regras da linha do veículo que valem para mudança manual de situação.
+
+    `preco_venda`: o preço que o veículo vai ter (na alteração, antes de gravar)."""
+    preco = veiculo.preco_venda if preco_venda is _PRECO_ATUAL else preco_venda
     vendido = veiculo.venda_ativa is not None
     if vendido and nova not in SITUACOES_VENDIDO:
         raise HTTPException(
@@ -142,7 +150,7 @@ def _conferir_situacao(veiculo: Veiculo, nova: Situacao) -> None:
             status.HTTP_409_CONFLICT,
             "Esta situação só vale para veículo vendido. Registre a venda primeiro.",
         )
-    if nova == Situacao.a_venda and veiculo.preco_venda is None:
+    if nova == Situacao.a_venda and preco is None:
         raise HTTPException(
             422,
             "Informe o preço de venda antes de colocar o veículo à venda.",
@@ -217,6 +225,46 @@ def detalhar(
     return _detalhe(_obter(db, veiculo_id), usuario)
 
 
+def conferir_atualizacao(db: Session, veiculo: Veiculo, campos: dict) -> None:
+    """As regras da edição, sem mudar nada: o assistente usa para avisar antes de pedir a
+    confirmação; `atualizar_veiculo` usa antes de gravar."""
+    for obrigatorio in ("tipo", "marca", "modelo", "valor_compra"):
+        if obrigatorio in campos and campos[obrigatorio] is None:
+            raise HTTPException(422, f"O campo {obrigatorio} é obrigatório.")
+    _conferir_duplicados(db, campos.get("placa"), campos.get("chassi"), ignorar_id=veiculo.id)
+    preco = campos["preco_venda"] if "preco_venda" in campos else veiculo.preco_venda
+    if veiculo.situacao == Situacao.a_venda and preco is None:
+        raise HTTPException(422, "Veículo à venda precisa ter preço de venda.")
+    nova_situacao = campos.get("situacao")
+    if nova_situacao is not None and nova_situacao != veiculo.situacao:
+        if nova_situacao == Situacao.vendido:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Para marcar como vendido, registre a venda."
+            )
+        _conferir_situacao(veiculo, nova_situacao, preco)
+
+
+def atualizar_veiculo(
+    db: Session, veiculo: Veiculo, dados: schemas.VeiculoAtualizar, usuario: Usuario
+) -> Veiculo:
+    """Altera o veículo. É o único caminho de edição: formulário (PATCH) e assistente passam
+    por aqui, com as mesmas regras e o mesmo audit log. `veiculo` vem travado (`_obter`)."""
+    db.info["usuario"] = usuario  # quem aparece no audit log
+    campos = dados.model_dump(exclude_unset=True)
+    conferir_atualizacao(db, veiculo, campos)
+    nova_situacao = campos.pop("situacao", None)
+    for campo, valor in campos.items():
+        setattr(veiculo, campo, valor)
+    if nova_situacao is not None and nova_situacao != veiculo.situacao:
+        mudar_situacao(veiculo, nova_situacao)
+    if "valor_compra" in campos:
+        recalcular_venda_do_veiculo(veiculo)
+    if "placa" in campos:
+        procedencia.ligar_laudos_ao_veiculo(db, veiculo)
+    db.commit()
+    return _obter(db, veiculo.id)
+
+
 @router.patch("/{veiculo_id}", response_model=schemas.VeiculoDetalhe)
 def atualizar(
     veiculo_id: int,
@@ -225,29 +273,7 @@ def atualizar(
     db: Session = Depends(obter_db),
 ):
     veiculo = _obter(db, veiculo_id, travar=True)
-    campos = dados.model_dump(exclude_unset=True)
-    for obrigatorio in ("tipo", "marca", "modelo", "valor_compra"):
-        if obrigatorio in campos and campos[obrigatorio] is None:
-            raise HTTPException(422, f"O campo {obrigatorio} é obrigatório.")
-    _conferir_duplicados(db, campos.get("placa"), campos.get("chassi"), ignorar_id=veiculo.id)
-    nova_situacao = campos.pop("situacao", None)
-    for campo, valor in campos.items():
-        setattr(veiculo, campo, valor)
-    if veiculo.situacao == Situacao.a_venda and veiculo.preco_venda is None:
-        raise HTTPException(422, "Veículo à venda precisa ter preço de venda.")
-    if nova_situacao is not None and nova_situacao != veiculo.situacao:
-        if nova_situacao == Situacao.vendido:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, "Para marcar como vendido, registre a venda."
-            )
-        _conferir_situacao(veiculo, nova_situacao)
-        mudar_situacao(veiculo, nova_situacao)
-    if "valor_compra" in campos:
-        recalcular_venda_do_veiculo(veiculo)
-    if "placa" in campos:
-        procedencia.ligar_laudos_ao_veiculo(db, veiculo)
-    db.commit()
-    return _detalhe(_obter(db, veiculo.id), usuario)
+    return _detalhe(atualizar_veiculo(db, veiculo, dados, usuario), usuario)
 
 
 @router.delete("/{veiculo_id}", status_code=status.HTTP_204_NO_CONTENT)
